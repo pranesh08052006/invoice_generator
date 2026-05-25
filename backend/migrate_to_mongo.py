@@ -7,7 +7,7 @@ from datetime import datetime
 
 # Connection settings
 SQLITE_DB = "invoice_app.db"
-MONGO_URL = "mongodb://localhost:27017"
+MONGO_URL = "mongodb://3.86.4.100:27017"
 MONGO_DB_NAME = "invoice_app_db"
 
 async def migrate():

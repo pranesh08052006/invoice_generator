@@ -5,7 +5,7 @@ from models import User, Product, Client
 from datetime import datetime
 
 async def seed():
-    client = AsyncIOMotorClient("mongodb://localhost:27017")
+    client = AsyncIOMotorClient("mongodb://3.86.4.100:27017")
     await init_beanie(database=client.invoice_app_db, document_models=[User, Product, Client])
     
     # Find the first user

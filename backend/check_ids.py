@@ -2,7 +2,7 @@ import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 
 async def check():
-    client = AsyncIOMotorClient('mongodb://localhost:27017')
+    client = AsyncIOMotorClient('mongodb://3.86.4.100:27017')
     db = client['invoice_app_db']
     users = await db.users.find().to_list(10)
     invoices = await db.invoices.find().to_list(10)

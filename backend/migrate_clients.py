@@ -19,7 +19,7 @@ class MigrationClient(Document):
         name = "clients"
 
 async def migrate():
-    client = AsyncIOMotorClient("mongodb://localhost:27017")
+    client = AsyncIOMotorClient("mongodb://3.86.4.100:27017")
     db = client["invoice_app_db"]
     await init_beanie(database=db, document_models=[MigrationClient])
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_BASE_URL from '../config';
 import { UserPlus, Trash2, Shield, User, Mail, Plus, X, Lock, Key, Check } from 'lucide-react';
 
 const AdminUsers = ({ user }) => {
@@ -14,7 +15,7 @@ const AdminUsers = ({ user }) => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('http://3.86.4.100:8000/admin/users');
+      const response = await axios.get(`${API_BASE_URL}/admin/users`);
       setUsers(response.data);
     } catch (err) { console.error(err); }
   };
@@ -24,7 +25,7 @@ const AdminUsers = ({ user }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://3.86.4.100:8000/admin/users', newUser);
+      await axios.post(`${API_BASE_URL}/admin/users`, newUser);
       setShowModal(false);
       setNewUser({ 
         full_name: '', 
@@ -41,7 +42,7 @@ const AdminUsers = ({ user }) => {
   const handleDelete = async (userId) => {
     if (window.confirm('Are you sure you want to remove this user from the organization?')) {
       try {
-        await axios.delete(`http://3.86.4.100:8000/admin/users/${userId}`);
+        await axios.delete(`${API_BASE_URL}/admin/users/${userId}`);
         fetchUsers();
       } catch (err) {
         alert('Error removing user');
@@ -64,8 +65,9 @@ const AdminUsers = ({ user }) => {
   };
 
   return (
-    <div className="animate-in">
-      <div className="flex justify-between items-center" style={{ marginBottom: '32px' }}>
+    <>
+      <div className="animate-in">
+        <div className="flex justify-between items-center" style={{ marginBottom: '32px' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.03em', color: 'var(--text-main)' }}>Team Management</h1>
           <p style={{ fontSize: '15px', color: 'var(--text-muted)' }}>Control access levels and manage administrative accounts for your team.</p>
@@ -136,48 +138,51 @@ const AdminUsers = ({ user }) => {
           </tbody>
         </table>
       </div>
+    </div>
 
       {showModal && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '480px' }}>
-            <div className="flex justify-between items-center" style={{ marginBottom: '32px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: '800', letterSpacing: '-0.02em' }}>Provision Account</h2>
-              <button onClick={() => setShowModal(false)} className="logout-btn"><X size={20} /></button>
+            <div className="modal-header">
+              <h2 style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.02em', margin: 0 }}>Provision Account</h2>
+              <button type="button" onClick={() => setShowModal(false)} className="logout-btn"><X size={20} /></button>
             </div>
-            <form onSubmit={handleSubmit}>
-              <div className="input-group" style={{ marginBottom: '20px' }}>
-                <label className="input-label">Legal Name</label>
-                <input placeholder="e.g. John Doe" className="input-field" value={newUser.full_name} onChange={e => setNewUser({...newUser, full_name: e.target.value})} required />
-              </div>
-              <div className="input-group" style={{ marginBottom: '20px' }}>
-                <label className="input-label">Corporate Email</label>
-                <input placeholder="user@organization.com" className="input-field" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} required />
-              </div>
-              <div className="input-group" style={{ marginBottom: '24px' }}>
-                <label className="input-label">Temporary Password</label>
-                <div style={{ position: 'relative' }}>
-                  <Key size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
-                  <input placeholder="Assign initial secret" type="password" className="input-field" style={{ paddingLeft: '36px' }} value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} required />
+            <div className="modal-body">
+              <form onSubmit={handleSubmit}>
+                <div className="input-group" style={{ marginBottom: '20px' }}>
+                  <label className="input-label">Legal Name</label>
+                  <input placeholder="e.g. John Doe" className="input-field" value={newUser.full_name} onChange={e => setNewUser({...newUser, full_name: e.target.value})} required />
                 </div>
-              </div>
-              <div className="input-group" style={{ marginBottom: '32px' }}>
-                <label className="input-label">Security Role</label>
-                <select className="input-field" value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})}>
-                  {user?.role === 'super_admin' ? (
-                    <option value="admin">Administrator (Full Access)</option>
-                  ) : (
-                    <option value="user">Billing Agent (Limited Access)</option>
-                  )}
-                </select>
-              </div>
-              <button type="submit" className="btn btn-primary w-full" style={{ height: '48px', fontSize: '15px' }}>
-                Provision Access Account
-              </button>
-            </form>
+                <div className="input-group" style={{ marginBottom: '20px' }}>
+                  <label className="input-label">Corporate Email</label>
+                  <input placeholder="user@organization.com" className="input-field" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} required />
+                </div>
+                <div className="input-group" style={{ marginBottom: '24px' }}>
+                  <label className="input-label">Temporary Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <Key size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+                    <input placeholder="Assign initial secret" type="password" className="input-field" style={{ paddingLeft: '36px' }} value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} required />
+                  </div>
+                </div>
+                <div className="input-group" style={{ marginBottom: '32px' }}>
+                  <label className="input-label">Security Role</label>
+                  <select className="input-field" value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})}>
+                    {user?.role === 'super_admin' ? (
+                      <option value="admin">Administrator (Full Access)</option>
+                    ) : (
+                      <option value="user">Billing Agent (Limited Access)</option>
+                    )}
+                  </select>
+                </div>
+                <button type="submit" className="btn btn-primary w-full" style={{ height: '48px', fontSize: '15px' }}>
+                  Provision Access Account
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

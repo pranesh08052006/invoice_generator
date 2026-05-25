@@ -7,6 +7,8 @@ import {
   ClipboardList, FileCheck, BarChart3
 } from 'lucide-react';
 import axios from 'axios';
+import API_BASE_URL from './config';
+
 
 // Pages
 import Login from './pages/Login';
@@ -328,7 +330,7 @@ const App = () => {
   const fetchCompany = async () => {
     if (!token) return;
     try {
-      const res = await axios.get('http://3.86.4.100:8000/company');
+      const res = await axios.get(`${API_BASE_URL}/company`);
       setCompany(res.data);
       setLogoVersion(Date.now());
     } catch (err) { console.error(err); }

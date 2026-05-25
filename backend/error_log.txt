@@ -102,3 +102,220 @@ Traceback (most recent call last):
     raise HTTPException(status_code=404, detail="Client not found")
 fastapi.exceptions.HTTPException: 404: Client not found
 
+[2026-05-25 22:06:32.694623] ERROR GENERATING PDF: cannot access local variable 'creator' where it is not associated with a value
+Traceback (most recent call last):
+  File "/home/gowthaman/Documents/invoice_generator/backend/main.py", line 612, in get_pdf
+    "name": (creator.full_name if creator else user.full_name) + " Business",
+                                  ^^^^^^^
+UnboundLocalError: cannot access local variable 'creator' where it is not associated with a value
+
+[2026-05-25 22:18:40.760166] ERROR GENERATING PDF: 
+fileName='d:\\invoice_generator\\image.png' identity=[ImageReader@0x781ae643cb90 filename='d:\\invoice_generator\\image.png'] Cannot open resource "d:\invoice_generator\image.png"
+Traceback (most recent call last):
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 525, in open_for_read
+    return open_for_read_by_name(name,mode)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 463, in open_for_read_by_name
+    return open(name,mode)
+           ^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'd:\\invoice_generator\\image.png'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 532, in open_for_read
+    return BytesIO((datareader if name[:5].lower()=='data:' else rlUrlRead)(name))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 478, in rlUrlRead
+    return urlopen(Request(name,headers=headers)).read()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 515, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 537, in _open
+    return self._call_chain(self.handle_open, 'unknown',
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1420, in unknown_open
+    raise URLError('unknown url type: %s' % type)
+urllib.error.URLError: <urlopen error unknown url type: d>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 647, in __init__
+    fp = open_for_read(fileName,'b')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 536, in open_for_read
+    return open_for_read(name,mode)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 534, in open_for_read
+    raise IOError('Cannot open resource "%s"' % name)
+OSError: Cannot open resource "d:\invoice_generator\image.png"
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/gowthaman/Documents/invoice_generator/backend/main.py", line 632, in get_pdf
+    pdf_buffer = generate_invoice_pdf(invoice, client, business_details)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/pdf_gen.py", line 296, in generate_invoice_pdf
+    doc.build(elements)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/doctemplate.py", line 1322, in build
+    BaseDocTemplate.build(self,flowables, canvasmaker=canvasmaker)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/doctemplate.py", line 1083, in build
+    self.handle_flowable(flowables)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/doctemplate.py", line 932, in handle_flowable
+    if frame.add(f, canv, trySplit=self.allowSplitting):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/frames.py", line 158, in _add
+    w, h = flowable.wrap(aW, h)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/tables.py", line 1364, in wrap
+    self._calc(availWidth, availHeight)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/tables.py", line 750, in _calc
+    self._calc_height(availHeight,availWidth,W=W)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/tables.py", line 671, in _calc_height
+    dW,t = self._listCellGeom(v,w or self._listValueWidth(v),s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/tables.py", line 507, in _listCellGeom
+    vw, vh = v.wrapOn(canv, aW, aH)
+             ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/flowables.py", line 123, in wrapOn
+    w, h = self.wrap(aW,aH)
+           ^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/flowables.py", line 510, in wrap
+    return self.drawWidth, self.drawHeight
+           ^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/flowables.py", line 504, in __getattr__
+    self._setup_inner()
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/flowables.py", line 461, in _setup_inner
+    img = self._img
+          ^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/flowables.py", line 498, in __getattr__
+    self._img = ImageReader(self._file)
+                ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 659, in __init__
+    annotateException('\nfileName=%r identity=%s'%(fileName,self.identity()))
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 1180, in annotateException
+    rl_reraise(t,t(sep.join((_ for _ in (msg,str(v),postMsg) if _))),b)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 138, in rl_reraise
+    raise v.with_traceback(b)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 647, in __init__
+    fp = open_for_read(fileName,'b')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 536, in open_for_read
+    return open_for_read(name,mode)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 534, in open_for_read
+    raise IOError('Cannot open resource "%s"' % name)
+OSError: 
+fileName='d:\\invoice_generator\\image.png' identity=[ImageReader@0x781ae643cb90 filename='d:\\invoice_generator\\image.png'] Cannot open resource "d:\invoice_generator\image.png"
+
+[2026-05-25 22:19:02.825954] ERROR GENERATING PDF: 
+fileName='d:\\invoice_generator\\image.png' identity=[ImageReader@0x781ae856bc80 filename='d:\\invoice_generator\\image.png'] Cannot open resource "d:\invoice_generator\image.png"
+Traceback (most recent call last):
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 525, in open_for_read
+    return open_for_read_by_name(name,mode)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 463, in open_for_read_by_name
+    return open(name,mode)
+           ^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'd:\\invoice_generator\\image.png'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 532, in open_for_read
+    return BytesIO((datareader if name[:5].lower()=='data:' else rlUrlRead)(name))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 478, in rlUrlRead
+    return urlopen(Request(name,headers=headers)).read()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 515, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 537, in _open
+    return self._call_chain(self.handle_open, 'unknown',
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1420, in unknown_open
+    raise URLError('unknown url type: %s' % type)
+urllib.error.URLError: <urlopen error unknown url type: d>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 647, in __init__
+    fp = open_for_read(fileName,'b')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 534, in open_for_read
+    raise IOError('Cannot open resource "%s"' % name)
+OSError: Cannot open resource "d:\invoice_generator\image.png"
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/gowthaman/Documents/invoice_generator/backend/main.py", line 632, in get_pdf
+    pdf_buffer = generate_invoice_pdf(invoice, client, business_details)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/pdf_gen.py", line 296, in generate_invoice_pdf
+    doc.build(elements)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/doctemplate.py", line 1322, in build
+    BaseDocTemplate.build(self,flowables, canvasmaker=canvasmaker)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/doctemplate.py", line 1083, in build
+    self.handle_flowable(flowables)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/doctemplate.py", line 932, in handle_flowable
+    if frame.add(f, canv, trySplit=self.allowSplitting):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/frames.py", line 158, in _add
+    w, h = flowable.wrap(aW, h)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/tables.py", line 1364, in wrap
+    self._calc(availWidth, availHeight)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/tables.py", line 750, in _calc
+    self._calc_height(availHeight,availWidth,W=W)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/tables.py", line 671, in _calc_height
+    dW,t = self._listCellGeom(v,w or self._listValueWidth(v),s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/tables.py", line 507, in _listCellGeom
+    vw, vh = v.wrapOn(canv, aW, aH)
+             ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/flowables.py", line 123, in wrapOn
+    w, h = self.wrap(aW,aH)
+           ^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/flowables.py", line 510, in wrap
+    return self.drawWidth, self.drawHeight
+           ^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/flowables.py", line 504, in __getattr__
+    self._setup_inner()
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/flowables.py", line 461, in _setup_inner
+    img = self._img
+          ^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/platypus/flowables.py", line 498, in __getattr__
+    self._img = ImageReader(self._file)
+                ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 659, in __init__
+    annotateException('\nfileName=%r identity=%s'%(fileName,self.identity()))
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 1180, in annotateException
+    rl_reraise(t,t(sep.join((_ for _ in (msg,str(v),postMsg) if _))),b)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 138, in rl_reraise
+    raise v.with_traceback(b)
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 647, in __init__
+    fp = open_for_read(fileName,'b')
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/gowthaman/Documents/invoice_generator/backend/venv/lib/python3.12/site-packages/reportlab/lib/utils.py", line 534, in open_for_read
+    raise IOError('Cannot open resource "%s"' % name)
+OSError: 
+fileName='d:\\invoice_generator\\image.png' identity=[ImageReader@0x781ae856bc80 filename='d:\\invoice_generator\\image.png'] Cannot open resource "d:\invoice_generator\image.png"
+

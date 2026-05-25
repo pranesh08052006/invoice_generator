@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE_URL from '../config';
+
 import { Search, Plus, Phone, MessageSquare, Hash, X, MapPin, Edit3, Trash2, User, ChevronDown, Layout, Eye, Download, Share2, FileText } from 'lucide-react';
 
 const Clients = () => {
@@ -31,7 +33,7 @@ const Clients = () => {
     try {
       const endpoint = type === 'QUOTATION' ? 'quotations' : type === 'PROFORMA' ? 'proformas' : 'invoices';
       const prefix = type === 'QUOTATION' ? 'QT' : type === 'PROFORMA' ? 'PI' : 'INV';
-      const response = await axios.get(`http://3.86.4.100:8000/${endpoint}/${id}/pdf`, { responseType: 'blob' });
+      const response = await axios.get(`${API_BASE_URL}/${endpoint}/${id}/pdf`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -49,7 +51,7 @@ const Clients = () => {
       const docList = type === 'QUOTATION' ? quotations : type === 'PROFORMA' ? proformas : invoices;
       const doc = docList.find(i => i.id === id);
       setSelectedInv(doc);
-      const response = await axios.get(`http://3.86.4.100:8000/${endpoint}/${id}/pdf`, { responseType: 'blob' });
+      const response = await axios.get(`${API_BASE_URL}/${endpoint}/${id}/pdf`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       setPreviewUrl(url);
       setShowPreview(true);
@@ -62,7 +64,7 @@ const Clients = () => {
     try {
       const endpoint = type === 'QUOTATION' ? 'quotations' : type === 'PROFORMA' ? 'proformas' : 'invoices';
       const prefix = type === 'QUOTATION' ? 'QT' : type === 'PROFORMA' ? 'PI' : 'INV';
-      const response = await axios.get(`http://3.86.4.100:8000/${endpoint}/${id}/pdf`, { responseType: 'blob' });
+      const response = await axios.get(`${API_BASE_URL}/${endpoint}/${id}/pdf`, { responseType: 'blob' });
       const file = new File([response.data], `${prefix}_${number}.pdf`, { type: 'application/pdf' });
       if (navigator.share) {
         await navigator.share({ files: [file], title: `${prefix} ${number}` });
@@ -77,10 +79,10 @@ const Clients = () => {
   const fetchClients = async () => {
     try {
       const [cRes, iRes, qRes, pRes] = await Promise.all([
-        axios.get('http://3.86.4.100:8000/clients'),
-        axios.get('http://3.86.4.100:8000/invoices'),
-        axios.get('http://3.86.4.100:8000/quotations'),
-        axios.get('http://3.86.4.100:8000/proformas')
+        axios.get(`${API_BASE_URL}/clients`),
+        axios.get(`${API_BASE_URL}/invoices`),
+        axios.get(`${API_BASE_URL}/quotations`),
+        axios.get(`${API_BASE_URL}/proformas`)
       ]);
       setClients(cRes.data);
       setInvoices(iRes.data);
@@ -229,9 +231,9 @@ const Clients = () => {
       if (whatsappSameAsPhone) payload.whatsapp = payload.mobile;
       
       if (editingId) {
-        await axios.put(`http://3.86.4.100:8000/clients/${editingId}`, payload);
+        await axios.put(`${API_BASE_URL}/clients/${editingId}`, payload);
       } else {
-        await axios.post('http://3.86.4.100:8000/clients', payload);
+        await axios.post(`${API_BASE_URL}/clients`, payload);
       }
       
       closeModal();
@@ -261,7 +263,7 @@ const Clients = () => {
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this customer? This action cannot be undone.')) return;
     try {
-      await axios.delete(`http://3.86.4.100:8000/clients/${id}`);
+      await axios.delete(`${API_BASE_URL}/clients/${id}`);
       fetchClients();
     } catch (err) {
       alert('Error deleting client');

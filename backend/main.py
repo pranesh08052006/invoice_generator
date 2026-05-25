@@ -195,7 +195,8 @@ async def get_company_details(user: User = Depends(get_current_user)):
     if company and company.signature_url:
         if not company.signature_url.startswith("http"):
             filename = os.path.basename(company.signature_url)
-            company.signature_url = f"http://3.86.4.100:8000/uploads/{filename}"
+            base_url = os.getenv("BASE_URL", "http://localhost:8000")
+            company.signature_url = f"{base_url}/uploads/{filename}"
     return company
 
 @app.post("/company", response_model=CompanyOut)
@@ -235,7 +236,8 @@ async def upload_logo(
         with open(file_path, "wb") as f:
             f.write(await file.read())
         
-        url = f"http://3.86.4.100:8000/{file_path}"
+        base_url = os.getenv("BASE_URL", "http://localhost:8000")
+        url = f"{base_url}/{file_path}"
         company = await Company.find_one(Company.user_id == str(user.id))
         if company:
             company.logo_url = url
@@ -270,7 +272,8 @@ async def upload_signature(
         await company.save()
         
         # Return full URL for frontend
-        return {"signature_url": f"http://3.86.4.100:8000/uploads/{filename}"}
+        base_url = os.getenv("BASE_URL", "http://localhost:8000")
+        return {"signature_url": f"{base_url}/uploads/{filename}"}
     except Exception as e:
         print(f"UPLOAD ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -570,6 +573,7 @@ async def get_pdf(
         if not invoice:
             raise HTTPException(status_code=404, detail="Invoice not found")
         
+        creator = None
         # Authorization
         can_access = False
         if user.role == UserRole.SUPER_ADMIN:

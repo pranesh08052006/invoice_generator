@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: invoice_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=mongodb://host.docker.internal:27017
+      - DATABASE_NAME=invoice_app_db
+      - BASE_URL=http://3.86.4.100:8000
+    volumes:
+      - ./backend/uploads:/app/uploads
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+
+  frontend:
+    build: ./frontend
+    container_name: invoice_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always

@@ -1,9 +1,10 @@
 fastapi
 uvicorn
-beanie
+beanie==1.26.0
 motor
 python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
 reportlab
 python-dotenv
+email-validator

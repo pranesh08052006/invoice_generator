@@ -45,10 +45,18 @@ const Products = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const payload = {
+        ...newProduct,
+        discount_value: Number(newProduct.discount_value) || 0,
+        price: Number(newProduct.price) || 0,
+        stock: Number(newProduct.stock) || 0,
+        gst_percent: Number(newProduct.gst_percent) || 0,
+      };
+
       if (editingId) {
-        await axios.put(`${API_BASE_URL}/products/${editingId}`, newProduct);
+        await axios.put(`${API_BASE_URL}/products/${editingId}`, payload);
       } else {
-        await axios.post(`${API_BASE_URL}/products`, newProduct);
+        await axios.post(`${API_BASE_URL}/products`, payload);
       }
       closeModal();
       fetchProducts();

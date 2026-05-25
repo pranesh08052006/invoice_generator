@@ -63,7 +63,7 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
     
     # 1. Header Section
     logo_url = business_details.get("logo_url")
-    logo_path = r"d:\invoice_generator\image.png"
+    logo_path = None
     logo_img = None
     
     if logo_url:
@@ -75,10 +75,11 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
         elif os.path.exists(p2):
             logo_path = p2
             
-    try:
-        logo_img = Image(logo_path, width=1.0*inch, height=0.5*inch)
-    except:
-        pass
+    if logo_path and os.path.exists(logo_path):
+        try:
+            logo_img = Image(logo_path, width=1.0*inch, height=0.5*inch)
+        except Exception as e:
+            print(f"Error loading logo image: {e}")
 
     biz_block = [
         Paragraph(business_details.get("name", "Mr.Saravanan Manickam"), biz_name_style),

@@ -1,273 +1,1140 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE_URL from '../config';
 import { 
-  Download, Share2, Plus, Search, FileText, 
-  User, Users, Shield, Filter, ChevronRight,
-  MoreVertical, Calendar, CreditCard
+  Download, Share2, Plus, Search, FileText, Trash2,
+  User, Calendar, CheckCircle, Eye, X, Copy, ChevronDown, MoreVertical, CreditCard
 } from 'lucide-react';
 
 const Invoices = ({ user }) => {
   const [invoices, setInvoices] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('ALL');
-  const [filterUserId, setFilterUserId] = useState('ALL');
+  const [clients, setClients] = useState([]);
+  const location = useLocation();
+  const [searchTerm, setSearchTerm] = useState(location.state?.clientName || '');
+  const [activeTab, setActiveTab] = useState('ALL'); // ALL, PAID, UNPAID, DRAFT
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [dateRange, setDateRange] = useState('ALL');
+
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Duplication State
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [duplicateDate, setDuplicateDate] = useState(new Date().toISOString().split('T')[0]);
+  const [duplicating, setDuplicating] = useState(false);
+  
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [selectedInv, setSelectedInv] = useState(null);
+
   const navigate = useNavigate();
 
   const fetchInvoices = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/invoices');
+      const response = await axios.get(`${API_BASE_URL}/invoices`);
       setInvoices(response.data);
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error(err); 
+    }
   };
 
-  useEffect(() => { fetchInvoices(); }, []);
+  const fetchClients = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/clients`);
+      setClients(response.data);
+    } catch (err) {
+      console.error("Failed to fetch clients:", err);
+    }
+  };
+
+  useEffect(() => { 
+    fetchInvoices(); 
+    fetchClients();
+  }, []);
 
   const handleDownload = async (id, number) => {
-    const response = await axios.get(`http://localhost:8000/invoices/${id}/pdf`, { responseType: 'blob' });
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `INV_${number}.pdf`);
-    document.body.appendChild(link);
-    link.click();
+    try {
+      const response = await axios.get(`${API_BASE_URL}/invoices/${id}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `INV_${number}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+    } catch (err) {
+      alert('Failed to download PDF.');
+    }
+  };
+
+  const handleView = async (id) => {
+    try {
+      const inv = invoices.find(i => i.id === id);
+      setSelectedInv(inv);
+      const response = await axios.get(`${API_BASE_URL}/invoices/${id}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      setPreviewUrl(url);
+      setShowPreview(true);
+    } catch (err) {
+      alert('Failed to preview invoice.');
+    }
   };
 
   const handleShare = async (id, number) => {
-    const response = await axios.get(`http://localhost:8000/invoices/${id}/pdf`, { responseType: 'blob' });
-    const file = new File([response.data], `INV_${number}.pdf`, { type: 'application/pdf' });
-    if (navigator.share) {
-      await navigator.share({ files: [file], title: `INV ${number}` });
-    } else {
-      alert('Share not supported on this browser.');
+    try {
+      const response = await axios.get(`${API_BASE_URL}/invoices/${id}/pdf`, { responseType: 'blob' });
+      const file = new File([response.data], `INV_${number}.pdf`, { type: 'application/pdf' });
+      if (navigator.share) {
+        await navigator.share({ files: [file], title: `INV ${number}` });
+      } else {
+        alert('Share not supported on this browser.');
+      }
+    } catch (err) {
+      alert('Failed to share.');
     }
   };
 
-  const filteredInvoices = invoices.filter(inv => {
-    const matchesSearch = inv.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         inv.user_full_name?.toLowerCase().includes(searchTerm.toLowerCase());
+  const handleDuplicate = async () => {
+    if (!selectedInvoice || !duplicateDate) return;
     
-    let matchesCategory = true;
-    if (user?.role === 'super_admin') {
-      if (activeTab === 'SUPER_ADMIN') matchesCategory = inv.user_role === 'super_admin';
-      else if (activeTab === 'ADMIN') matchesCategory = inv.user_role === 'admin';
-      else if (activeTab === 'USER') matchesCategory = inv.user_role === 'user';
-    } else if (user?.role === 'admin') {
-      if (activeTab === 'MY_INVOICES') matchesCategory = inv.user_id === user.id;
-      else if (activeTab === 'MANAGED_USERS') matchesCategory = inv.user_id !== user.id;
-      
-      if (filterUserId !== 'ALL') {
-        matchesCategory = matchesCategory && inv.user_id === filterUserId;
-      }
-    }
-    
-    return matchesSearch && matchesCategory;
-  });
-
-  const uniqueUsers = Array.from(new Set(invoices.filter(inv => inv.user_id !== user.id).map(inv => JSON.stringify({id: inv.user_id, name: inv.user_full_name}))))
-    .map(s => JSON.parse(s));
-
-  const TabButton = ({ id, label, icon: Icon }) => (
-    <button 
-      className={`tab-btn ${activeTab === id ? 'active' : ''}`} 
-      onClick={() => setActiveTab(id)}
-    >
-      {Icon && <Icon size={14} />}
-      {label}
-    </button>
-  );
-
-  const handleMarkAsPaid = async (id) => {
+    setDuplicating(true);
     try {
-      await axios.patch(`http://localhost:8000/invoices/${id}/status`, { status: 'PAID' });
+      const token = localStorage.getItem('token');
+      const payload = {
+        client_id: selectedInvoice.client_id,
+        invoice_number: `INV-${Date.now().toString().slice(-4)}`, 
+        date: duplicateDate,
+        discount_type: selectedInvoice.discount_type || 'percentage',
+        discount_value: selectedInvoice.discount_value || 0,
+        paid_amount: 0, 
+        status: 'UNPAID',
+        payment_mode: selectedInvoice.payment_mode || 'CASH',
+        items: selectedInvoice.items.map(item => ({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          price: item.price,
+          discount_value: item.discount_value || 0,
+          discount_type: item.discount_type || 'percentage',
+          gst_percent: item.gst_percent !== undefined && item.gst_percent !== null ? item.gst_percent : 0
+        }))
+      };
+
+      await axios.post(`${API_BASE_URL}/invoices`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setShowDuplicateModal(false);
+      setSelectedInvoice(null);
       fetchInvoices();
+      alert("Invoice duplicated successfully!");
     } catch (err) {
-      alert('Error updating status');
+      console.error("Duplication failed:", err);
+      alert("Failed to duplicate invoice.");
+    } finally {
+      setDuplicating(false);
     }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this invoice? This action cannot be undone.")) return;
+    try {
+      await axios.delete(`${API_BASE_URL}/invoices/${id}`);
+      fetchInvoices();
+      alert("Invoice deleted successfully!");
+    } catch (err) {
+      alert(`Failed to delete: ${err.response?.data?.detail || err.message}`);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (filteredInvoices.length === 0) {
+      alert("No data available to export.");
+      return;
+    }
+
+    // Map client IDs to their display names
+    const clientMap = {};
+    clients.forEach(c => {
+      clientMap[c.id] = c.company_name || c.contact_person || 'N/A';
+    });
+
+    const headers = [
+      "Invoice Reference",
+      "Issued By",
+      "Client Name",
+      "Date",
+      "Subtotal (INR)",
+      "GST Tax (INR)",
+      "Discount",
+      "Net Amount (INR)",
+      "Paid Amount (INR)",
+      "Balance (INR)",
+      "Payment Mode",
+      "Status"
+    ];
+
+    const rows = filteredInvoices.map(inv => {
+      const clientName = clientMap[inv.client_id] || "Unknown Client";
+      const subtotal = inv.sub_total || 0;
+      const gst = inv.total_gst || 0;
+      const discount = inv.discount_value 
+        ? `${inv.discount_value}${inv.discount_type === 'percentage' ? '%' : ' INR'}` 
+        : '0%';
+      const netAmount = inv.total_amount || 0;
+      const paid = inv.paid_amount || 0;
+      const balance = netAmount - paid;
+      const dateFormatted = inv.date 
+        ? new Date(inv.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+        : 'N/A';
+
+      return [
+        inv.invoice_number ? `"${inv.invoice_number.replace(/"/g, '""')}"` : '""',
+        inv.user_full_name ? `"${inv.user_full_name.replace(/"/g, '""')}"` : '"User"',
+        `"${clientName.replace(/"/g, '""')}"`,
+        `"${dateFormatted}"`,
+        subtotal.toFixed(2),
+        gst.toFixed(2),
+        `"${discount}"`,
+        netAmount.toFixed(2),
+        paid.toFixed(2),
+        balance.toFixed(2),
+        inv.payment_mode ? `"${inv.payment_mode.replace(/"/g, '""')}"` : '"CASH"',
+        inv.status ? `"${inv.status.toUpperCase()}"` : '"UNPAID"'
+      ];
+    });
+
+    const csvContent = "\uFEFF" + [
+      headers.join(","),
+      ...rows.map(e => e.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Transactions_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const toggleStatus = async (inv) => {
     const currentStatus = (inv.status || 'UNPAID').toUpperCase();
     const newStatus = currentStatus === 'PAID' ? 'UNPAID' : 'PAID';
     try {
-      await axios.patch(`http://localhost:8000/invoices/${inv.id}/status`, { status: newStatus });
+      await axios.patch(`${API_BASE_URL}/invoices/${inv.id}/status`, { status: newStatus });
       fetchInvoices();
     } catch (err) { 
-      alert(`Update failed: ${err.response?.data?.detail || err.message}`);
+      alert('Failed to update status');
     }
   };
 
+  const filteredInvoices = invoices.filter(inv => {
+    const clientName = clients.find(c => c.id === inv.client_id)?.company_name || '';
+    const matchesSearch = inv.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          inv.user_full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          clientName.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Tab filter
+    let matchesTab = true;
+    if (activeTab === 'PAID') matchesTab = inv.status?.toLowerCase() === 'paid';
+    else if (activeTab === 'UNPAID') matchesTab = inv.status?.toLowerCase() !== 'paid' && inv.status?.toLowerCase() !== 'draft';
+    else if (activeTab === 'DRAFT') matchesTab = inv.status?.toLowerCase() === 'draft';
+
+    // Status dropdown filter (overrides tab if set)
+    let matchesStatus = true;
+    if (statusFilter !== 'ALL') {
+      matchesStatus = inv.status?.toUpperCase() === statusFilter;
+    }
+
+    // Date range filter
+    const now = new Date();
+    const invDate = new Date(inv.date);
+    let matchesDate = true;
+    if (dateRange === '7') {
+      const cutoff = new Date(now); cutoff.setDate(now.getDate() - 7);
+      matchesDate = invDate >= cutoff;
+    } else if (dateRange === '30') {
+      const cutoff = new Date(now); cutoff.setDate(now.getDate() - 30);
+      matchesDate = invDate >= cutoff;
+    } else if (dateRange === '90') {
+      const cutoff = new Date(now); cutoff.setDate(now.getDate() - 90);
+      matchesDate = invDate >= cutoff;
+    } else if (dateRange === '365') {
+      const cutoff = new Date(now); cutoff.setFullYear(now.getFullYear() - 1);
+      matchesDate = invDate >= cutoff;
+    } else if (dateRange === 'CUSTOM') {
+      matchesDate = (!startDate || invDate >= new Date(startDate)) &&
+                    (!endDate   || invDate <= new Date(endDate));
+    }
+    
+    return matchesSearch && matchesTab && matchesStatus && matchesDate;
+  });
+
+  const totalVolume = invoices.filter(inv => inv.status?.toLowerCase() !== 'draft').reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+  const paidInvoicesCount = invoices.filter(inv => inv.status?.toLowerCase() === 'paid').length;
+  const realizedRevenue = invoices.filter(inv => inv.status?.toLowerCase() !== 'draft').reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+  const pendingSettlement = totalVolume - realizedRevenue;
+  const unpaidCount = invoices.filter(inv => inv.status?.toLowerCase() !== 'paid' && inv.status?.toLowerCase() !== 'draft').length;
+  const draftCount = invoices.filter(inv => inv.status?.toLowerCase() === 'draft').length;
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-32">
-        <h2 className="page-title">Transaction History</h2>
-        <button className="btn btn-primary" onClick={() => navigate('/invoices/new')}>
-          <Plus size={18} /> New Invoice
+    <>
+      <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+      
+      {/* Redesigned Title Workspace Header */}
+      <div style={{ display: 'flex', justifybox: 'space-between', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1 style={{ fontSize: '26px', fontWeight: '800', letterSpacing: '-0.02em', color: '#111827', margin: 0 }}>
+            Transactions
+          </h1>
+          <p style={{ fontSize: '14px', color: '#6b7280', margin: '4px 0 0 0' }}>
+            Manage and view all your invoice history.
+          </p>
+        </div>
+        <button 
+          type="button"
+          onClick={() => navigate('/invoices/new')} 
+          style={{ 
+            backgroundColor: 'var(--primary-color)',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '10px 20px', 
+            fontSize: '13px',
+            fontWeight: '700',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            transition: 'all 0.15s ease',
+            boxShadow: '0 2px 4px var(--primary-light)'
+          }}
+          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-hover)'}
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--primary-color)'}
+        >
+          <Plus size={16} /> New Transaction
         </button>
       </div>
 
-      <div className="card mb-32" style={{ padding: '8px' }}>
-        <div className="flex justify-between items-center flex-wrap gap-16 p-8">
-          <div className="flex gap-4">
-            <TabButton id="ALL" label="All History" />
-            {user?.role === 'super_admin' ? (
-              <>
-                <TabButton id="SUPER_ADMIN" label="My Invoices" icon={Shield} />
-                <TabButton id="ADMIN" label="Admins" icon={User} />
-                <TabButton id="USER" label="Regular Users" icon={Users} />
-              </>
-            ) : user?.role === 'admin' ? (
-              <>
-                <TabButton id="MY_INVOICES" label="My Invoices" icon={Shield} />
-                <TabButton id="MANAGED_USERS" label="User Invoices" icon={Users} />
-              </>
-            ) : null}
+      {/* Grid row of 3 Premium Metrics cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+        
+        {/* Total Volume */}
+        <div style={{ 
+          padding: '24px', 
+          backgroundColor: '#ffffff', 
+          border: '1px solid #eaedf3', 
+          borderRadius: '12px', 
+          position: 'relative',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.01)'
+        }}>
+          <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Total Volume
+          </span>
+          <div style={{ fontSize: '28px', fontWeight: '800', marginTop: '8px', color: '#111827' }}>
+            ₹{totalVolume.toLocaleString()}
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', fontSize: '12.5px', color: '#10b981', fontWeight: '700' }}>
+            <span>▲ +12%</span>
+            <span style={{ color: '#9ca3af', fontWeight: '500' }}>vs last month</span>
+          </div>
+          <div style={{ position: 'absolute', right: '24px', top: '24px', width: '36px', height: '36px', borderRadius: '8px', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FileText size={18} style={{ color: 'var(--primary-color)' }} />
+          </div>
+        </div>
 
-          <div className="flex items-center gap-16">
-            {user?.role === 'admin' && activeTab !== 'MY_INVOICES' && uniqueUsers.length > 0 && (
-              <div className="flex items-center gap-8">
-                <Filter size={14} className="text-muted" />
-                <select 
-                  className="input-field" 
-                  style={{ width: 'auto', padding: '6px 12px', fontSize: '12px' }}
-                  value={filterUserId}
-                  onChange={(e) => setFilterUserId(e.target.value)}
-                >
-                  <option value="ALL">All Users</option>
-                  {uniqueUsers.map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div style={{ position: 'relative' }}>
-              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input 
-                type="text" 
-                placeholder="Search..." 
-                className="input-field"
-                style={{ paddingLeft: '36px', width: '200px' }}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+        {/* Realized Revenue */}
+        <div style={{ 
+          padding: '24px', 
+          backgroundColor: '#ffffff', 
+          border: '1px solid #eaedf3', 
+          borderRadius: '12px', 
+          position: 'relative',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.01)'
+        }}>
+          <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Realized Revenue
+          </span>
+          <div style={{ fontSize: '28px', fontWeight: '800', marginTop: '8px', color: '#10b981' }}>
+            ₹{realizedRevenue.toLocaleString()}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', fontSize: '12.5px', color: '#6b7280', fontWeight: '600' }}>
+            <span>{totalVolume > 0 ? Math.round((realizedRevenue / totalVolume) * 100) : 0}% of total volume</span>
+          </div>
+          <div style={{ position: 'absolute', right: '24px', top: '24px', width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CheckCircle size={18} style={{ color: '#10b981' }} />
+          </div>
+        </div>
+
+        {/* Pending Settlement */}
+        <div style={{ 
+          padding: '24px', 
+          backgroundColor: '#ffffff', 
+          border: '1px solid #eaedf3', 
+          borderRadius: '12px', 
+          position: 'relative',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.01)'
+        }}>
+          <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Pending Settlement
+          </span>
+          <div style={{ fontSize: '28px', fontWeight: '800', marginTop: '8px', color: '#f59e0b' }}>
+            ₹{pendingSettlement.toLocaleString()}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', fontSize: '12.5px', color: '#6b7280', fontWeight: '600' }}>
+            <span>Awaiting payment</span>
+          </div>
+          <div style={{ position: 'absolute', right: '24px', top: '24px', width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#fffbeb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CreditCard size={18} style={{ color: '#f59e0b' }} />
           </div>
         </div>
       </div>
 
-      <div className="table-container shadow-sm">
-        <table>
+      {/* Main card covering Tab nav, search pipeline, and invoice table */}
+      <div style={{ 
+        backgroundColor: '#ffffff', 
+        border: '1px solid #eaedf3', 
+        borderRadius: '12px', 
+        overflow: 'hidden',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.01)',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        
+        {/* Tab navigation headers */}
+        <div style={{ 
+          display: 'flex', 
+          borderBottom: '1px solid #eaedf3', 
+          padding: '0 32px',
+          alignItems: 'center',
+          gap: '24px',
+          height: '56px'
+        }}>
+          <button 
+            type="button"
+            onClick={() => setActiveTab('ALL')}
+            style={{
+              height: '100%',
+              border: 'none',
+              backgroundColor: 'transparent',
+              fontSize: '13.5px',
+              fontWeight: '700',
+              color: activeTab === 'ALL' ? 'var(--primary-color)' : '#6b7280',
+              cursor: 'pointer',
+              position: 'relative',
+              padding: '0 4px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            All History
+            {activeTab === 'ALL' && (
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', backgroundColor: 'var(--primary-color)', borderRadius: '999px' }} />
+            )}
+          </button>
+          <button 
+            type="button"
+            onClick={() => setActiveTab('PAID')}
+            style={{
+              height: '100%',
+              border: 'none',
+              backgroundColor: 'transparent',
+              fontSize: '13.5px',
+              fontWeight: '700',
+              color: activeTab === 'PAID' ? 'var(--primary-color)' : '#6b7280',
+              cursor: 'pointer',
+              position: 'relative',
+              padding: '0 4px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            Paid
+            {activeTab === 'PAID' && (
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', backgroundColor: 'var(--primary-color)', borderRadius: '999px' }} />
+            )}
+          </button>
+          <button 
+            type="button"
+            onClick={() => setActiveTab('UNPAID')}
+            style={{
+              height: '100%',
+              border: 'none',
+              backgroundColor: 'transparent',
+              fontSize: '13.5px',
+              fontWeight: '700',
+              color: activeTab === 'UNPAID' ? 'var(--primary-color)' : '#6b7280',
+              cursor: 'pointer',
+              position: 'relative',
+              padding: '0 4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            Unpaid
+            {unpaidCount > 0 && (
+              <span style={{
+                backgroundColor: '#ef4444',
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: '700',
+                padding: '2px 8px',
+                borderRadius: '999px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {unpaidCount}
+              </span>
+            )}
+            {activeTab === 'UNPAID' && (
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', backgroundColor: 'var(--primary-color)', borderRadius: '999px' }} />
+            )}
+          </button>
+          <button 
+            type="button"
+            onClick={() => setActiveTab('DRAFT')}
+            style={{
+              height: '100%',
+              border: 'none',
+              backgroundColor: 'transparent',
+              fontSize: '13.5px',
+              fontWeight: '700',
+              color: activeTab === 'DRAFT' ? 'var(--primary-color)' : '#6b7280',
+              cursor: 'pointer',
+              position: 'relative',
+              padding: '0 4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            Drafts
+            {draftCount > 0 && (
+              <span style={{
+                backgroundColor: '#9ca3af',
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: '700',
+                padding: '2px 8px',
+                borderRadius: '999px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {draftCount}
+              </span>
+            )}
+            {activeTab === 'DRAFT' && (
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', backgroundColor: 'var(--primary-color)', borderRadius: '999px' }} />
+            )}
+          </button>
+        </div>
+
+        {/* Registry Filter row */}
+        <div style={{ 
+          padding: '16px 32px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          backgroundColor: '#ffffff',
+          borderBottom: '1px solid #eaedf3'
+        }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flex: 1 }}>
+            
+            {/* Search Input bar */}
+            <div style={{ position: 'relative', width: '320px' }}>
+              <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+              <input 
+                type="text" 
+                placeholder="Search reference or customer..." 
+                style={{ 
+                  width: '100%',
+                  height: '40px',
+                  paddingLeft: '42px', 
+                  paddingRight: '16px',
+                  border: '1px solid #e2e8f0', 
+                  backgroundColor: '#ffffff',
+                  color: '#1e3a8a',
+                  borderRadius: '8px', 
+                  fontSize: '13.5px',
+                  fontWeight: '500',
+                  outline: 'none',
+                  transition: 'all 0.15s ease'
+                }}
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+              />
+            </div>
+
+            {/* Status filter */}
+            <div style={{ position: 'relative', width: '150px' }}>
+              <select 
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '40px',
+                  padding: '0 32px 0 14px',
+                  border: `1px solid ${statusFilter !== 'ALL' ? 'var(--primary-color)' : '#e2e8f0'}`,
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: statusFilter !== 'ALL' ? 'var(--primary-color)' : '#4b5563',
+                  backgroundColor: statusFilter !== 'ALL' ? 'var(--primary-light)' : '#ffffff',
+                  appearance: 'none',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="PAID">Paid</option>
+                <option value="UNPAID">Unpaid</option>
+                <option value="PARTIAL">Partial</option>
+                <option value="DRAFT">Draft</option>
+              </select>
+              <ChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280', pointerEvents: 'none' }} />
+            </div>
+
+            {/* Date range filter */}
+            <div style={{ position: 'relative', width: '150px' }}>
+              <select 
+                value={dateRange}
+                onChange={e => {
+                  setDateRange(e.target.value);
+                  if (e.target.value !== 'CUSTOM') { setStartDate(''); setEndDate(''); }
+                }}
+                style={{
+                  width: '100%',
+                  height: '40px',
+                  padding: '0 32px 0 14px',
+                  border: `1px solid ${dateRange !== 'ALL' ? 'var(--primary-color)' : '#e2e8f0'}`,
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: dateRange !== 'ALL' ? 'var(--primary-color)' : '#4b5563',
+                  backgroundColor: dateRange !== 'ALL' ? 'var(--primary-light)' : '#ffffff',
+                  appearance: 'none',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="ALL">All Time</option>
+                <option value="7">Last 7 Days</option>
+                <option value="30">Last 30 Days</option>
+                <option value="90">Last 3 Months</option>
+                <option value="365">Last Year</option>
+                <option value="CUSTOM">Custom Range</option>
+              </select>
+              <ChevronDown size={14} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280', pointerEvents: 'none' }} />
+            </div>
+
+            {/* Custom date range inputs */}
+            {dateRange === 'CUSTOM' && (
+              <>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  style={{
+                    height: '40px',
+                    padding: '0 12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#4b5563',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                />
+                <span style={{ color: '#9ca3af', fontWeight: '700', fontSize: '13px' }}>→</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  style={{
+                    height: '40px',
+                    padding: '0 12px',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#4b5563',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                />
+              </>
+            )}
+          </div>
+
+          <div>
+            <button 
+              type="button"
+              style={{
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: 'var(--primary-color)',
+                fontSize: '13.5px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              onClick={handleExportCSV}
+            >
+              <Download size={15} /> Export CSV
+            </button>
+          </div>
+        </div>
+
+        {/* Data Table */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
-            <tr>
-              <th>Invoice Info</th>
-              <th>Creator</th>
-              <th>Date</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th style={{ width: '220px', textAlign: 'right', paddingRight: '16px' }}>Actions</th>
+            <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #eaedf3' }}>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', paddingLeft: '32px' }}>Reference #</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Issued By</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Net Amount</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Status</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', paddingRight: '32px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredInvoices.map(inv => (
-              <tr key={inv.id}>
-                <td>
-                  <div className="flex items-center gap-12">
-                    <div className="avatar" style={{ background: '#f8fafc', color: 'var(--primary)', width: '32px', height: '32px' }}>
-                      <FileText size={14} />
+            {filteredInvoices.map(inv => {
+              const isPaid = inv.status?.toLowerCase() === 'paid';
+              return (
+                <tr key={inv.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'all 0.15s ease' }}>
+                  
+                  {/* Reference # */}
+                  <td style={{ padding: '16px 24px', paddingLeft: '32px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <FileText size={16} style={{ color: 'var(--primary-color)' }} />
+                      </div>
+                      <span style={{ fontWeight: '700', color: '#111827', fontSize: '14.5px' }}>#{inv.invoice_number}</span>
                     </div>
-                    <div>
-                      <div className="font-bold">#{inv.invoice_number}</div>
-                      <div className="text-xs text-muted">ID: {inv.id}</div>
+                  </td>
+
+                  {/* Issued By */}
+                  <td style={{ padding: '16px 24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ 
+                        width: '24px', 
+                        height: '24px', 
+                        fontSize: '10px', 
+                        borderRadius: '6px',
+                        backgroundColor: 'var(--primary-light)',
+                        color: 'var(--primary-color)',
+                        fontWeight: '700',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        {(inv.user_full_name || 'U')[0]?.toUpperCase()}
+                      </div>
+                      <span style={{ fontWeight: '600', fontSize: '13.5px', color: '#4b5563' }}>{inv.user_full_name || 'User'}</span>
                     </div>
-                  </div>
-                </td>
-                <td>
-                  <div className="flex flex-col">
-                    <span className="font-bold text-sm">{inv.user_full_name}</span>
-                    <span className="text-xs text-muted capitalize">{inv.user_role?.replace('_', ' ')}</span>
-                  </div>
-                </td>
-                <td className="text-muted">
-                  <div className="flex items-center gap-8">
-                    <Calendar size={14} />
-                    {new Date(inv.date).toLocaleDateString()}
-                  </div>
-                </td>
-                <td>
-                  <div className="font-bold">₹{inv.total_amount?.toLocaleString()}</div>
-                </td>
-                <td>
-                  <span className={`badge ${inv.status?.toLowerCase() === 'paid' ? 'badge-success' : 'badge-error'}`} style={{ minWidth: '80px', textAlign: 'center' }}>
-                    {(inv.status || 'unpaid').toUpperCase()}
-                  </span>
-                </td>
-                <td style={{ width: '220px', textAlign: 'right', paddingRight: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '16px' }}>
-                    {inv.status?.toLowerCase() !== 'paid' && (
-                      <button 
-                        className="btn btn-primary" 
-                        style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '6px', whiteSpace: 'nowrap' }}
-                        onClick={() => toggleStatus(inv)}
-                      >
-                        MARK AS PAID
-                      </button>
+                  </td>
+
+                  {/* Date */}
+                  <td style={{ padding: '16px 24px' }}>
+                    <div style={{ fontSize: '13px', color: '#4b5563', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '500' }}>
+                      <Calendar size={14} style={{ color: '#9ca3af' }} />
+                      {new Date(inv.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
+                  </td>
+
+                  {/* Net Amount */}
+                  <td style={{ padding: '16px 24px' }}>
+                    <span style={{ fontWeight: '800', fontSize: '14.5px', color: '#111827' }}>
+                      ₹{inv.total_amount?.toLocaleString()}
+                    </span>
+                  </td>
+
+                  {/* Status Badge */}
+                  <td style={{ padding: '16px 24px' }}>
+                    {isPaid ? (
+                      <div style={{
+                        backgroundColor: '#ecfdf5',
+                        color: '#10b981',
+                        borderRadius: '9999px',
+                        padding: '4px 12px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        display: 'inline-flex',
+                        alignItems: 'center'
+                      }}>
+                        PAID
+                      </div>
+                    ) : (
+                      <div style={{
+                        backgroundColor: '#fdf2f2',
+                        color: '#ef4444',
+                        borderRadius: '9999px',
+                        padding: '4px 12px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        display: 'inline-flex',
+                        alignItems: 'center'
+                      }}>
+                        UNPAID
+                      </div>
                     )}
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="icon-btn" onClick={() => handleDownload(inv.id, inv.invoice_number)} title="Download PDF">
-                        <Download size={18} />
-                      </button>
-                      <button className="icon-btn" onClick={() => handleShare(inv.id, inv.invoice_number)} title="Share Invoice">
-                        <Share2 size={18} />
-                      </button>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+
+                  {/* Context Sensitive Actions */}
+                  <td style={{ padding: '16px 24px', paddingRight: '32px', textAlign: 'right' }}>
+                    {isPaid ? (
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setSelectedInvoice(inv);
+                            setDuplicateDate(new Date().toISOString().split('T')[0]);
+                            setShowDuplicateModal(true);
+                          }}
+                          style={{ border: 'none', backgroundColor: 'transparent', color: '#4b5563', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Duplicate"
+                        >
+                          <Copy size={15} />
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => handleView(inv.id)}
+                          style={{ border: 'none', backgroundColor: 'transparent', color: '#4b5563', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Preview"
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => handleDownload(inv.id, inv.invoice_number)}
+                          style={{ border: 'none', backgroundColor: 'transparent', color: '#4b5563', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Export PDF"
+                        >
+                          <Download size={15} />
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => handleShare(inv.id, inv.invoice_number)}
+                          style={{ border: 'none', backgroundColor: 'transparent', color: '#4b5563', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Share"
+                        >
+                          <Share2 size={15} />
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => handleDelete(inv.id)}
+                          style={{ border: 'none', backgroundColor: 'transparent', color: '#64748b', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Delete"
+                          onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <button 
+                          type="button"
+                          onClick={() => toggleStatus(inv)}
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            backgroundColor: '#ffffff',
+                            color: '#10b981',
+                            border: '1px solid #10b981',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.backgroundColor = '#ecfdf5';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.backgroundColor = '#ffffff';
+                          }}
+                        >
+                          Mark Paid
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => handleView(inv.id)}
+                          style={{ border: 'none', backgroundColor: 'transparent', color: '#4b5563', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Preview"
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => {
+                            setSelectedInvoice(inv);
+                            setDuplicateDate(new Date().toISOString().split('T')[0]);
+                            setShowDuplicateModal(true);
+                          }}
+                          style={{ border: 'none', backgroundColor: 'transparent', color: '#4b5563', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="More Options"
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => handleDelete(inv.id)}
+                          style={{ border: 'none', backgroundColor: 'transparent', color: '#64748b', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          title="Delete"
+                          onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+
         {filteredInvoices.length === 0 && (
-          <div className="text-center py-60">
-            <FileText size={48} className="text-muted" style={{ margin: '0 auto 16px', opacity: 0.3 }} />
-            <p className="text-muted">No transactions matching your criteria were found.</p>
+          <div style={{ padding: '80px', textAlign: 'center' }}>
+            <FileText size={48} color="#e2e8f0" style={{ marginBottom: '20px' }} />
+            <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#111827' }}>No Transactions Recorded</h3>
+            <p style={{ fontSize: '13.5px', color: '#6b7280', marginTop: '8px' }}>Adjust your filters or create a new invoice to get started.</p>
           </div>
         )}
-      </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        .tab-btn {
-          padding: 8px 16px;
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 600;
-          color: var(--text-muted);
-          background: transparent;
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          transition: all 0.2s;
-        }
-        .tab-btn:hover { background: #f1f5f9; color: var(--text); }
-        .tab-btn.active { background: #eef2ff; color: var(--primary); }
-        .icon-btn {
-          width: 32px;
-          height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 8px;
-          border: 1px solid var(--border);
-          background: white;
-          color: var(--text-muted);
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .icon-btn:hover { background: var(--bg); color: var(--primary); border-color: var(--primary); }
-      `}} />
+        {/* Footer pagination statistics */}
+        <div style={{
+          padding: '16px 32px',
+          borderTop: '1px solid #eaedf3',
+          backgroundColor: '#ffffff',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div style={{ fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>
+            Showing 1 to {filteredInvoices.length} of {filteredInvoices.length} entries
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              type="button"
+              style={{
+                padding: '6px 16px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: '700',
+                color: '#9ca3af',
+                cursor: 'not-allowed'
+              }}
+              disabled
+            >
+              Previous
+            </button>
+            <button 
+              type="button"
+              style={{
+                padding: '6px 10px',
+                backgroundColor: 'var(--primary-color)',
+                border: '1px solid var(--primary-color)',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: '700',
+                color: '#ffffff',
+                cursor: 'pointer',
+                minWidth: '32px'
+              }}
+            >
+              1
+            </button>
+            <button 
+              type="button"
+              style={{
+                padding: '6px 16px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: '700',
+                color: '#9ca3af',
+                cursor: 'not-allowed'
+              }}
+              disabled
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
+
+      {/* Overhauled Centered Frosted Preview Modal Dialog */}
+      {showPreview && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff', width: '95%', maxWidth: '1000px', height: '85vh',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            border: '1px solid #eaedf3', borderRadius: '12px', display: 'flex', flexDirection: 'column',
+            overflow: 'hidden'
+          }}>
+            <div style={{ 
+              padding: '20px 28px', 
+              borderBottom: '1px solid #eaedf3', 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              backgroundColor: '#ffffff'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FileText size={18} style={{ color: 'var(--primary-color)' }} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '15px', fontWeight: '800', color: '#111827', margin: 0 }}>Invoice Preview</h2>
+                  <p style={{ fontSize: '12px', color: '#6b7280', margin: '2px 0 0 0' }}>{selectedInv?.invoice_number} | {selectedInv?.company_name}</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button 
+                  type="button"
+                  className="btn" 
+                  onClick={() => handleDownload(selectedInv?.id, selectedInv?.invoice_number)}
+                  style={{ 
+                    padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '700',
+                    backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer'
+                  }}
+                >
+                  <Download size={15} /> Download
+                </button>
+                <button 
+                  type="button"
+                  className="btn"
+                  onClick={() => handleShare(selectedInv?.id, selectedInv?.invoice_number)}
+                  style={{ 
+                    padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '700',
+                    backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer'
+                  }}
+                >
+                  <Share2 size={15} /> Share
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowPreview(false);
+                    setPreviewUrl(null);
+                  }}
+                  style={{ padding: '8px', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', color: '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div style={{ flex: 1, backgroundColor: '#525659', overflow: 'hidden' }}>
+              <iframe 
+                src={previewUrl} 
+                style={{ width: '100%', height: '100%', border: 'none' }}
+                title="Invoice Preview Frame"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Centered Frosted Duplicate modal */}
+      {showDuplicateModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{ 
+            backgroundColor: '#ffffff', width: '100%', maxWidth: '420px', borderRadius: '12px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            border: '1px solid #eaedf3', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Copy size={18} style={{ color: 'var(--primary-color)' }} />
+                </div>
+                <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#111827', margin: 0 }}>Duplicate Invoice</h2>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowDuplicateModal(false)}
+                style={{ padding: '6px', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', color: '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <p style={{ fontSize: '13.5px', color: '#6b7280', margin: 0, lineHeight: '1.5' }}>
+              Duplicating invoice <strong>#{selectedInvoice?.invoice_number}</strong>. Please select a new issue date for the duplicated record.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>New Issue Date</label>
+              <input 
+                type="date" 
+                style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', width: '100%' }}
+                value={duplicateDate} 
+                onChange={e => setDuplicateDate(e.target.value)} 
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+              <button 
+                type="button"
+                style={{
+                  flex: 1, padding: '10px 20px', fontSize: '13px', fontWeight: '700', color: '#4b5563',
+                  backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer'
+                }}
+                onClick={() => setShowDuplicateModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                style={{
+                  flex: 1, padding: '10px 20px', backgroundColor: 'var(--primary-color)', color: '#ffffff',
+                  border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+                onClick={handleDuplicate}
+                disabled={duplicating || !duplicateDate}
+              >
+                {duplicating ? 'Creating...' : 'Confirm Duplicate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

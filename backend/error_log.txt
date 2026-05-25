@@ -2,3 +2,103 @@
 status
   Input should be 'PAID', 'PARTIAL' or 'UNPAID' [type=enum, input_value='paid', input_type=str]
     For further information visit https://errors.pydantic.dev/2.12/v/enum
+[2026-05-12 12:30:29.765118] ERROR GENERATING PDF: 'Paragraph' object is not iterable
+[2026-05-12 12:30:31.631028] ERROR GENERATING PDF: 'Paragraph' object is not iterable
+[2026-05-12 12:30:34.370964] ERROR GENERATING PDF: 'Paragraph' object is not iterable
+[2026-05-12 12:30:35.884726] ERROR GENERATING PDF: 'Paragraph' object is not iterable
+[2026-05-12 12:30:37.494981] ERROR GENERATING PDF: 'Paragraph' object is not iterable
+[2026-05-12 12:30:55.025457] ERROR GENERATING PDF: 'Paragraph' object is not iterable
+[2026-05-12 12:30:56.005491] ERROR GENERATING PDF: 'Paragraph' object is not iterable
+[2026-05-12 12:31:00.232696] ERROR GENERATING PDF: 'Paragraph' object is not iterable
+[2026-05-12 12:52:05.684326] ERROR GENERATING PDF: user_id
+[2026-05-12 12:52:08.271225] ERROR GENERATING PDF: user_id
+[2026-05-12 12:55:56.220439] ERROR GENERATING PDF: name 'os' is not defined
+[2026-05-12 12:57:11.153267] ERROR GENERATING PDF: name 'os' is not defined
+[2026-05-12 12:59:44.644333] ERROR GENERATING PDF: name 'os' is not defined
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 516, in get_pdf
+    pdf_buffer = generate_invoice_pdf(invoice, client, business_details)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\invoice_generator\backend\pdf_gen.py", line 202, in generate_invoice_pdf
+    if sig_url and os.path.exists(sig_url):
+                   ^^
+NameError: name 'os' is not defined
+
+[2026-05-12 13:01:27.256733] ERROR GENERATING PDF: name 'os' is not defined
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 516, in get_pdf
+    pdf_buffer = generate_invoice_pdf(invoice, client, business_details)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\invoice_generator\backend\pdf_gen.py", line 202, in generate_invoice_pdf
+    if sig_url and os.path.exists(sig_url):
+                   ^^
+NameError: name 'os' is not defined
+
+[2026-05-14 14:28:33.354286] ERROR GENERATING PDF: name 'invoice_data' is not defined
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 602, in get_pdf
+    pdf_buffer = generate_invoice_pdf(invoice, client, business_details)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\invoice_generator\backend\pdf_gen.py", line 133, in generate_invoice_pdf
+    total_amount = invoice_data.total_amount
+                   ^^^^^^^^^^^^
+NameError: name 'invoice_data' is not defined
+
+[2026-05-14 14:28:35.669707] ERROR GENERATING PDF: name 'invoice_data' is not defined
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 602, in get_pdf
+    pdf_buffer = generate_invoice_pdf(invoice, client, business_details)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\invoice_generator\backend\pdf_gen.py", line 133, in generate_invoice_pdf
+    total_amount = invoice_data.total_amount
+                   ^^^^^^^^^^^^
+NameError: name 'invoice_data' is not defined
+
+[2026-05-14 14:29:25.194611] ERROR GENERATING PDF: 404: Client not found
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 599, in get_pdf
+    raise HTTPException(status_code=404, detail="Client not found")
+fastapi.exceptions.HTTPException: 404: Client not found
+
+[2026-05-14 14:29:25.957474] ERROR GENERATING PDF: 404: Client not found
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 599, in get_pdf
+    raise HTTPException(status_code=404, detail="Client not found")
+fastapi.exceptions.HTTPException: 404: Client not found
+
+[2026-05-14 18:13:48.705583] ERROR GENERATING PDF: 404: Client not found
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 599, in get_pdf
+    raise HTTPException(status_code=404, detail="Client not found")
+fastapi.exceptions.HTTPException: 404: Client not found
+
+[2026-05-14 18:13:50.675557] ERROR GENERATING PDF: 404: Client not found
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 599, in get_pdf
+    raise HTTPException(status_code=404, detail="Client not found")
+fastapi.exceptions.HTTPException: 404: Client not found
+
+[2026-05-14 18:13:51.606461] ERROR GENERATING PDF: 404: Client not found
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 599, in get_pdf
+    raise HTTPException(status_code=404, detail="Client not found")
+fastapi.exceptions.HTTPException: 404: Client not found
+
+[2026-05-14 19:13:11.407868] ERROR GENERATING PDF: 404: Client not found
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 599, in get_pdf
+    raise HTTPException(status_code=404, detail="Client not found")
+fastapi.exceptions.HTTPException: 404: Client not found
+
+[2026-05-14 19:13:13.900026] ERROR GENERATING PDF: 404: Client not found
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 599, in get_pdf
+    raise HTTPException(status_code=404, detail="Client not found")
+fastapi.exceptions.HTTPException: 404: Client not found
+
+[2026-05-14 19:13:14.709979] ERROR GENERATING PDF: 404: Client not found
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 599, in get_pdf
+    raise HTTPException(status_code=404, detail="Client not found")
+fastapi.exceptions.HTTPException: 404: Client not found
+

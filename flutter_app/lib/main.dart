@@ -121,101 +121,172 @@ class _MainLayoutState extends State<MainLayout> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('INVOICER.', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary)),
+        title: Image.asset('assets/logo.png', height: 28),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        centerTitle: false,
         actions: [
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.notifications_none_outlined, color: AppColors.textMuted),
+          ),
+          const SizedBox(width: 8),
           IconButton(
             onPressed: () async {
               await _authService.logout();
               if (mounted) Navigator.pushReplacementNamed(context, '/login');
             },
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout_rounded, color: AppColors.error),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
+        backgroundColor: AppColors.sidebarBg,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.zero,
+        ),
+        child: Column(
           children: [
-            UserAccountsDrawerHeader(
-              accountName: Text(_user!.fullName),
-              accountEmail: Text(_user!.role.name.replaceAll('_', ' ').toUpperCase()),
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: Colors.white,
-                child: Text(_user!.fullName[0], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary)),
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 60, 20, 30),
+              decoration: const BoxDecoration(
+                color: Color(0xFF0F172A),
               ),
-              decoration: const BoxDecoration(color: AppColors.primary),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: AppColors.primary,
+                    child: Text(
+                      _user!.fullName[0],
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _user!.fullName,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
+                        ),
+                        Text(
+                          _user!.role.name.replaceAll('_', ' ').toUpperCase(),
+                          style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.dashboard_outlined),
-              title: const Text('Overview'),
-              onTap: () {
-                Navigator.pop(context);
-                _dashboardKey.currentState?.fetchMainStats();
-              },
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                children: [
+                  _buildDrawerItem(
+                    icon: Icons.dashboard_rounded,
+                    title: 'Overview',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _dashboardKey.currentState?.fetchMainStats();
+                    },
+                  ),
+                  if (_user!.role == UserRole.user) ...[
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(24, 20, 24, 8),
+                      child: Text('TRANSACTIONS', style: TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.0)),
+                    ),
+                    _buildDrawerItem(
+                      icon: Icons.add_circle_rounded,
+                      title: 'New Invoice',
+                      onTap: () async {
+                        Navigator.pop(context);
+                        final result = await Navigator.pushNamed(context, '/invoices/new');
+                        if (result == true) _dashboardKey.currentState?.fetchMainStats();
+                      },
+                    ),
+                    _buildDrawerItem(
+                      icon: Icons.people_rounded,
+                      title: 'Customers',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, '/clients');
+                      },
+                    ),
+                    _buildDrawerItem(
+                      icon: Icons.inventory_2_rounded,
+                      title: 'Inventory',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, '/products');
+                      },
+                    ),
+                    _buildDrawerItem(
+                      icon: Icons.description_rounded,
+                      title: 'Transactions',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, '/invoices', arguments: _user);
+                      },
+                    ),
+                  ],
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    child: Divider(color: Color(0xFF334155)),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(24, 8, 24, 8),
+                    child: Text('ADMINISTRATION', style: TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.0)),
+                  ),
+                  if (_user!.role == UserRole.super_admin || _user!.role == UserRole.admin)
+                    _buildDrawerItem(
+                      icon: Icons.manage_accounts_rounded,
+                      title: _user!.role == UserRole.super_admin ? "Manage Managers" : "Manage Employees",
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, '/admin/users', arguments: _user);
+                      },
+                    ),
+                  _buildDrawerItem(
+                    icon: Icons.settings_rounded,
+                    title: 'Company Profile',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pushNamed(context, '/settings');
+                    },
+                  ),
+                ],
+              ),
             ),
-            if (_user!.role == UserRole.user) ...[
-              ListTile(
-                leading: const Icon(Icons.add_circle_outline),
-                title: const Text('New Invoice'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final result = await Navigator.pushNamed(context, '/invoices/new');
-                  if (result == true) {
-                    _dashboardKey.currentState?.fetchMainStats();
-                  }
-                },
+            Container(
+              padding: const EdgeInsets.all(20),
+              color: const Color(0xFF0F172A),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.shield_rounded, color: AppColors.primary, size: 16),
+                  SizedBox(width: 8),
+                  Text('Secure Cloud Sync', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+                ],
               ),
-              ListTile(
-                leading: const Icon(Icons.people_outline),
-                title: const Text('Customers'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.pushNamed(context, '/clients');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.inventory_2_outlined),
-                title: const Text('Inventory'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.pushNamed(context, '/products');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.description_outlined),
-                title: const Text('Transactions'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.pushNamed(context, '/invoices', arguments: _user);
-                },
-              ),
-            ],
-            const Divider(),
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('ADMINISTRATION', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.textMuted)),
-            ),
-            if (_user!.role == UserRole.super_admin || _user!.role == UserRole.admin)
-              ListTile(
-                leading: const Icon(Icons.person_add_outlined),
-                title: Text(_user!.role == UserRole.super_admin ? "Manage Managers" : "Manage Employees"),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.pushNamed(context, '/admin/users', arguments: _user);
-                },
-              ),
-            ListTile(
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text('Company Profile'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/settings');
-              },
             ),
           ],
         ),
       ),
       body: DashboardScreen(key: _dashboardKey, user: _user!),
+    );
+  }
+
+  Widget _buildDrawerItem({required IconData icon, required String title, required VoidCallback onTap}) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+      leading: Icon(icon, color: Colors.white.withOpacity(0.7), size: 22),
+      title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
+      onTap: onTap,
+      hoverColor: Colors.white.withOpacity(0.05),
     );
   }
 }

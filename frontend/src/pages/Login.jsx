@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import logo from '../assets/logo.png';
+import API_BASE_URL from '../config';
 
 const Login = ({ login }) => {
   const [email, setEmail] = useState('');
@@ -7,6 +10,12 @@ const Login = ({ login }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Interactive UI states for smooth SaaS micro-animations
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [btnHovered, setBtnHovered] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,7 +25,7 @@ const Login = ({ login }) => {
       const formData = new FormData();
       formData.append('username', email);
       formData.append('password', password);
-      const response = await axios.post('http://localhost:8000/auth/login', formData);
+      const response = await axios.post(`${API_BASE_URL}/auth/login`, formData);
       login(response.data.user, response.data.access_token);
     } catch (err) {
       setError('Invalid email or password.');
@@ -28,167 +37,328 @@ const Login = ({ login }) => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#f8fafc',
+      background: 'radial-gradient(circle at 50% 50%, #f4f6fc 0%, #e8eef9 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: "'Plus Jakarta Sans', sans-serif",
+      padding: '24px',
+      fontFamily: "'Inter', -apple-system, sans-serif"
     }}>
-      <div style={{
-        width: '400px',
-        background: '#ffffff',
-        border: '1px solid #e2e8f0',
+      <div className="animate-in" style={{
+        width: '100%',
+        maxWidth: '430px',
+        backgroundColor: '#ffffff',
         borderRadius: '16px',
-        padding: '48px 40px',
-        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.07)',
+        border: '1px solid rgba(0, 0, 0, 0.08)',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.02)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
-
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <img
-            src="/logo.png"
-            alt="Logo"
-            style={{ width: '96px', height: '96px', objectFit: 'contain' }}
-          />
-        </div>
-
-        {/* Heading */}
-        <h1 style={{
-          fontSize: '22px', fontWeight: '800', color: '#0f172a',
-          margin: '0 0 4px', letterSpacing: '-0.3px',
-        }}>
-          Sign in
-        </h1>
-        <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 32px', fontWeight: '500' }}>
-          Enter your credentials to continue
-        </p>
-
-        <form onSubmit={handleSubmit}>
-          {/* Email */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{
-              display: 'block', fontSize: '13px', fontWeight: '600',
-              color: '#0f172a', marginBottom: '6px',
+        {/* Main Content Area */}
+        <div style={{ padding: '40px 40px 32px 40px' }}>
+          {/* Brand & Logo */}
+          <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+            <div style={{ 
+              width: '54px', 
+              height: '54px', 
+              borderRadius: '12px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              margin: '0 auto 16px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 4px 12px var(--primary-light)',
+              overflow: 'hidden'
             }}>
-              Email address
-            </label>
-            <input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              style={{
-                width: '100%', padding: '11px 14px',
-                borderRadius: '10px', border: '1px solid #e2e8f0',
-                fontSize: '14px', fontFamily: 'inherit',
-                color: '#0f172a', background: '#fcfcfd',
-                outline: 'none', boxSizing: 'border-box',
-                transition: 'border-color 0.15s, box-shadow 0.15s',
-              }}
-              onFocus={e => {
-                e.target.style.borderColor = '#6366f1';
-                e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)';
-                e.target.style.background = '#fff';
-              }}
-              onBlur={e => {
-                e.target.style.borderColor = '#e2e8f0';
-                e.target.style.boxShadow = 'none';
-                e.target.style.background = '#fcfcfd';
-              }}
-            />
+              <img src={logo} alt="Logo" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+            </div>
+            
+            <h1 style={{ 
+              fontSize: '24px', 
+              fontWeight: '800', 
+              color: 'var(--primary-color)',
+              letterSpacing: '-0.02em',
+              margin: '0 0 4px 0'
+            }}>
+              Digital Viyabari
+            </h1>
+            
+            <p style={{ 
+              color: '#9ca3af', 
+              fontSize: '11px', 
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+              margin: '0 0 28px 0'
+            }}>
+              Enterprise billing, simplified.
+            </p>
+
+            <h2 style={{ 
+              fontSize: '26px', 
+              fontWeight: '800', 
+              color: '#0f172a',
+              letterSpacing: '-0.02em',
+              margin: '0 0 6px 0'
+            }}>
+              Welcome back
+            </h2>
+
+            <p style={{ 
+              color: '#6b7280', 
+              fontSize: '14px',
+              margin: 0
+            }}>
+              Sign in to manage your enterprise billing.
+            </p>
           </div>
 
-          {/* Password */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={{
-              display: 'block', fontSize: '13px', fontWeight: '600',
-              color: '#0f172a', marginBottom: '6px',
+          <form onSubmit={handleSubmit}>
+            {/* Email Field */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+              <label style={{ 
+                fontSize: '11px', 
+                fontWeight: '700', 
+                color: '#4b5563', 
+                letterSpacing: '0.05em' 
+              }}>
+                EMAIL
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Mail size={18} style={{ 
+                  position: 'absolute', 
+                  left: '14px', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)', 
+                  color: emailFocused ? 'var(--primary-color)' : '#9ca3af',
+                  transition: 'color 0.2s ease'
+                }} />
+                <input
+                  type="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  onFocus={() => setEmailFocused(true)}
+                  onBlur={() => setEmailFocused(false)}
+                  required
+                  style={{
+                    width: '100%',
+                    height: '48px',
+                    paddingLeft: '44px',
+                    paddingRight: '16px',
+                    borderRadius: '8px',
+                    border: `1px solid ${emailFocused ? 'var(--primary-color)' : '#d1d5db'}`,
+                    outline: 'none',
+                    backgroundColor: '#ffffff',
+                    color: '#1f2937',
+                    fontSize: '14px',
+                    transition: 'all 0.2s ease',
+                    boxShadow: emailFocused ? '0 0 0 4px var(--primary-light)' : 'none'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Password Field */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ 
+                  fontSize: '11px', 
+                  fontWeight: '700', 
+                  color: '#4b5563', 
+                  letterSpacing: '0.05em' 
+                }}>
+                  PASSWORD
+                </label>
+                <a 
+                  href="#" 
+                  style={{ 
+                    fontSize: '12px', 
+                    color: 'var(--primary-color)', 
+                    fontWeight: '600', 
+                    textDecoration: 'none' 
+                  }}
+                  onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                  onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                >
+                  Forgot?
+                </a>
+              </div>
+              <div style={{ position: 'relative' }}>
+                <Lock size={18} style={{ 
+                  position: 'absolute', 
+                  left: '14px', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)', 
+                  color: passwordFocused ? 'var(--primary-color)' : '#9ca3af',
+                  transition: 'color 0.2s ease'
+                }} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  onFocus={() => setPasswordFocused(true)}
+                  onBlur={() => setPasswordFocused(false)}
+                  required
+                  style={{
+                    width: '100%',
+                    height: '48px',
+                    paddingLeft: '44px',
+                    paddingRight: '44px',
+                    borderRadius: '8px',
+                    border: `1px solid ${passwordFocused ? 'var(--primary-color)' : '#d1d5db'}`,
+                    outline: 'none',
+                    backgroundColor: '#ffffff',
+                    color: '#1f2937',
+                    fontSize: '14px',
+                    transition: 'all 0.2s ease',
+                    boxShadow: passwordFocused ? '0 0 0 4px var(--primary-light)' : 'none'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(s => !s)}
+                  style={{
+                    position: 'absolute', 
+                    right: '14px', 
+                    top: '50%',
+                    transform: 'translateY(-50%)', 
+                    background: 'none',
+                    border: 'none', 
+                    cursor: 'pointer', 
+                    color: '#9ca3af',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Remember Me Checkbox */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              margin: '20px 0 24px 0'
             }}>
-              Password
-            </label>
-            <div style={{ position: 'relative' }}>
               <input
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
+                type="checkbox"
+                id="remember-me"
+                checked={rememberMe}
+                onChange={e => setRememberMe(e.target.checked)}
                 style={{
-                  width: '100%', padding: '11px 42px 11px 14px',
-                  borderRadius: '10px', border: '1px solid #e2e8f0',
-                  fontSize: '14px', fontFamily: 'inherit',
-                  color: '#0f172a', background: '#fcfcfd',
-                  outline: 'none', boxSizing: 'border-box',
-                  transition: 'border-color 0.15s, box-shadow 0.15s',
-                }}
-                onFocus={e => {
-                  e.target.style.borderColor = '#6366f1';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)';
-                  e.target.style.background = '#fff';
-                }}
-                onBlur={e => {
-                  e.target.style.borderColor = '#e2e8f0';
-                  e.target.style.boxShadow = 'none';
-                  e.target.style.background = '#fcfcfd';
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '4px',
+                  border: '1px solid #d1d5db',
+                  accentColor: 'var(--primary-color)',
+                  cursor: 'pointer'
                 }}
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(s => !s)}
+              <label
+                htmlFor="remember-me"
                 style={{
-                  position: 'absolute', right: '12px', top: '50%',
-                  transform: 'translateY(-50%)', background: 'none',
-                  border: 'none', cursor: 'pointer', color: '#94a3b8',
-                  fontSize: '14px', padding: 0, lineHeight: 1,
+                  fontSize: '13px',
+                  color: '#4b5563',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  fontWeight: '500'
                 }}
               >
-                {showPassword ? '🙈' : '👁'}
-              </button>
+                Remember me
+              </label>
             </div>
-          </div>
 
-          {/* Error */}
-          {error && (
-            <p style={{
-              fontSize: '13px', color: '#ef4444', fontWeight: '600',
-              margin: '0 0 16px', padding: '10px 14px',
-              background: '#fef2f2', border: '1px solid #fecaca',
-              borderRadius: '8px',
-            }}>
-              {error}
-            </p>
-          )}
+            {/* Error Message */}
+            {error && (
+              <div style={{ 
+                width: '100%', 
+                padding: '12px 16px', 
+                borderRadius: '8px', 
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fca5a5',
+                color: '#b91c1c',
+                fontSize: '13px',
+                fontWeight: '500',
+                marginBottom: '20px',
+                textAlign: 'center',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+              }}>
+                {error}
+              </div>
+            )}
 
-          {/* Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%', padding: '12px',
-              background: loading ? '#a5b4fc' : '#6366f1',
-              color: '#fff', border: 'none', borderRadius: '10px',
-              fontSize: '14px', fontWeight: '700',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontFamily: 'inherit', letterSpacing: '0.2px',
-              transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#4f46e5'; }}
-            onMouseLeave={e => { if (!loading) e.currentTarget.style.background = '#6366f1'; }}
-          >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              onMouseEnter={() => setBtnHovered(true)}
+              onMouseLeave={() => setBtnHovered(false)}
+              style={{
+                width: '100%',
+                height: '48px',
+                backgroundColor: loading ? 'var(--primary-light)' : (btnHovered ? 'var(--primary-hover)' : 'var(--primary-color)'),
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: '700',
+                letterSpacing: '0.06em',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease',
+                boxShadow: btnHovered ? '0 4px 12px var(--primary-light)' : 'none',
+                transform: btnHovered ? 'translateY(-1px)' : 'none'
+              }}
+            >
+              {loading ? 'SIGNING IN...' : (
+                <>
+                  SIGN IN TO DASHBOARD
+                  <span style={{ fontSize: '15px', fontWeight: 'bold' }}>→</span>
+                </>
+              )}
+            </button>
+          </form>
+        </div>
 
-        <p style={{
-          textAlign: 'center', fontSize: '12px', color: '#94a3b8',
-          fontWeight: '500', marginTop: '24px',
+        {/* Footer Area */}
+        <div style={{
+          backgroundColor: '#f8fafc',
+          borderTop: '1px solid #e2e8f0',
+          padding: '18px 40px',
+          textAlign: 'center',
+          fontSize: '13px',
+          color: '#4b5563'
         }}>
-          Contact your administrator to get access
-        </p>
+          Don't have an account?{' '}
+          <a 
+            href="#" 
+            style={{ 
+              color: 'var(--primary-color)', 
+              fontWeight: '600', 
+              textDecoration: 'none',
+              transition: 'color 0.2s ease'
+            }}
+            onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+            onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+          >
+            Contact Admin
+          </a>
+        </div>
       </div>
     </div>
   );
 };
 
 export default Login;
+

@@ -54,47 +54,119 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('COMPANY DETAILS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Company Profile'),
+        surfaceTintColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildField('COMPANY NAME', _nameController),
-              const SizedBox(height: 20),
-              _buildField('ADDRESS', _addressController, maxLines: 3),
-              const SizedBox(height: 20),
-              _buildField('GST NUMBER', _gstController),
-              const SizedBox(height: 20),
-              _buildField('MOBILE NUMBER', _mobileController),
-              const SizedBox(height: 40),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _handleSave,
-                  child: const Text('SAVE DETAILS'),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'BUSINESS INFORMATION',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textMuted,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Update your company details for invoice branding',
+                    style: TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildField('Company Name', _nameController, icon: Icons.business_rounded),
+                    const SizedBox(height: 24),
+                    _buildField('Business Address', _addressController, icon: Icons.location_on_rounded, maxLines: 3),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(child: _buildField('GST Number', _gstController, icon: Icons.receipt_long_rounded)),
+                        const SizedBox(width: 16),
+                        Expanded(child: _buildField('Phone Number', _mobileController, icon: Icons.phone_rounded)),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
+                    SizedBox(
+                      width: double.infinity,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.3),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: ElevatedButton(
+                          onPressed: _handleSave,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: const Text('Update Profile', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 40),
+            Center(
+              child: Text(
+                'v1.0.4 Premium Edition',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted.withOpacity(0.5)),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, {int maxLines = 1}) {
+  Widget _buildField(String label, TextEditingController controller, {required IconData icon, int maxLines = 1}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
-        const SizedBox(height: 8),
+        Text(
+          label.toUpperCase(), 
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.textMuted, letterSpacing: 0.5)
+        ),
+        const SizedBox(height: 10),
         TextField(
           controller: controller,
           maxLines: maxLines,
-          decoration: const InputDecoration(contentPadding: EdgeInsets.all(12)),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: 'Enter $label',
+            prefixIcon: Icon(icon, size: 18),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          ),
         ),
       ],
     );

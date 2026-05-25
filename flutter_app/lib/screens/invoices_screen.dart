@@ -137,30 +137,54 @@ class _InvoicesScreenState extends State<InvoicesScreen> with SingleTickerProvid
     final filtered = _getFilteredInvoices();
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Transactions', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Transactions'),
+        surfaceTintColor: Colors.white,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(110),
+          preferredSize: const Size.fromHeight(120),
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (val) => setState(() => _searchTerm = val),
-                  decoration: InputDecoration(
-                    hintText: 'Search...',
-                    prefixIcon: const Icon(Icons.search),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                    filled: true,
-                    fillColor: Colors.grey[100],
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (val) => setState(() => _searchTerm = val),
+                    decoration: InputDecoration(
+                      hintText: 'Search invoice # or creator...',
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted),
+                      fillColor: Colors.white,
+                      filled: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                   ),
                 ),
               ),
               TabBar(
                 controller: _tabController,
                 isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textMuted,
+                indicatorColor: AppColors.primary,
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                dividerColor: Colors.transparent,
                 tabs: _getTabs(),
               ),
             ],
@@ -170,122 +194,182 @@ class _InvoicesScreenState extends State<InvoicesScreen> with SingleTickerProvid
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : filtered.isEmpty
-              ? const Center(child: Text('No transactions found.'))
-              : ListView.builder(
+              ? _buildEmptyState()
+              : ListView.separated(
+                  physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.all(16),
                   itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     return _buildInvoiceCard(filtered[index]);
                   },
                 ),
       floatingActionButton: widget.user.role == UserRole.user
-          ? FloatingActionButton(
+          ? FloatingActionButton.extended(
               onPressed: () async {
                 final result = await Navigator.pushNamed(context, '/invoices/new');
                 if (result == true) _fetchInvoices();
               },
-              child: const Icon(Icons.add),
+              backgroundColor: AppColors.primary,
+              icon: const Icon(Icons.add_rounded, color: Colors.white),
+              label: const Text('New Invoice', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             )
           : null,
     );
   }
 
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.description_outlined, size: 64, color: AppColors.textMuted.withOpacity(0.3)),
+          const SizedBox(height: 16),
+          const Text(
+            'No transactions found',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Start by creating a new invoice',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Widget> _getTabs() {
     if (widget.user.role == UserRole.super_admin) {
-      return const [Tab(text: 'ALL'), Tab(text: 'MY'), Tab(text: 'ADMINS'), Tab(text: 'USERS')];
+      return const [Tab(text: 'All Activity'), Tab(text: 'My Invoices'), Tab(text: 'Managers'), Tab(text: 'Employees')];
     }
     if (widget.user.role == UserRole.admin) {
-      return const [Tab(text: 'ALL'), Tab(text: 'MY'), Tab(text: 'USERS')];
+      return const [Tab(text: 'All Activity'), Tab(text: 'My Invoices'), Tab(text: 'Employees')];
     }
-    return const [Tab(text: 'ALL')];
+    return const [Tab(text: 'All Activity')];
   }
 
   Widget _buildInvoiceCard(dynamic inv) {
-    final currencyFormat = NumberFormat.currency(symbol: '₹', locale: 'en_IN');
-    final isPaid = (inv['status'] ?? '').toString().toUpperCase() == 'PAID';
+    final currencyFormat = NumberFormat.currency(symbol: '₹', locale: 'en_IN', decimalDigits: 0);
+    final status = (inv['status'] ?? '').toString().toUpperCase();
+    final isPaid = status == 'PAID';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Card(
+      child: InkWell(
+        onTap: () {},
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
             children: [
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                    child: const Icon(Icons.description_outlined, color: AppColors.primary, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
                     children: [
-                      Text('#${inv['invoice_number']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text(DateFormat('dd/MM/yyyy').format(DateTime.parse(inv['date'])), style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
+                        child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF64748B), size: 20),
+                      ),
+                      const SizedBox(width: 14),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('INV-${inv['invoice_number']}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.text)),
+                          const SizedBox(height: 2),
+                          Text(DateFormat('dd MMM, yyyy').format(DateTime.parse(inv['date'])), style: const TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  InkWell(
+                    onTap: () => _handleStatusUpdate(inv['id'].toString(), isPaid ? 'UNPAID' : 'PAID'),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isPaid ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        status,
+                        style: TextStyle(color: isPaid ? const Color(0xFF16A34A) : const Color(0xFFDC2626), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('GENERATED BY', style: TextStyle(color: AppColors.textMuted, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                        const SizedBox(height: 4),
+                        Text(inv['user_name'] ?? 'System', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.text)),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text('TOTAL AMOUNT', style: TextStyle(color: AppColors.textMuted, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                      const SizedBox(height: 4),
+                      Text(currencyFormat.format(inv['total_amount']), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: AppColors.primary, letterSpacing: -0.5)),
                     ],
                   ),
                 ],
               ),
-              GestureDetector(
-                onTap: () => _handleStatusUpdate(inv['id'].toString(), isPaid ? 'UNPAID' : 'PAID'),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: (isPaid ? AppColors.success : AppColors.error).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    inv['status'].toString().toUpperCase(),
-                    style: TextStyle(color: isPaid ? AppColors.success : AppColors.error, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  const Text('CREATOR', style: TextStyle(color: AppColors.textMuted, fontSize: 10, fontWeight: FontWeight.bold)),
-                  Text(inv['user_name'] ?? 'System', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text('AMOUNT', style: TextStyle(color: AppColors.textMuted, fontSize: 10, fontWeight: FontWeight.bold)),
-                  Text(currencyFormat.format(inv['total_amount']), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.text)),
+                  _buildActionButton(
+                    icon: Icons.file_download_outlined,
+                    label: 'PDF',
+                    onTap: () => _handleDownload(inv['id'], inv['invoice_number']),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildActionButton(
+                    icon: Icons.share_rounded,
+                    label: 'Share',
+                    onTap: () => _handleShare(inv['id'], inv['invoice_number']),
+                  ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                onPressed: () => _handleDownload(inv['id'], inv['invoice_number']),
-                icon: const Icon(Icons.file_download_outlined, color: AppColors.textMuted, size: 22),
-              ),
-              IconButton(
-                onPressed: () => _handleShare(inv['id'], inv['invoice_number']),
-                icon: const Icon(Icons.share_outlined, color: AppColors.textMuted, size: 22),
-              ),
-            ],
-          ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({required IconData icon, required String label, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFF1F5F9)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: const Color(0xFF64748B)),
+            const SizedBox(width: 6),
+            Text(label, style: const TextStyle(color: Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w700)),
+          ],
+        ),
       ),
     );
   }

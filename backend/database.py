@@ -10,7 +10,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "mongodb://localhost:27017")
 DATABASE_NAME = os.getenv("DATABASE_NAME", "invoice_app_db")
 
 async def init_db():
-    from models import User, Client, Product, Invoice
+    from models import User, Client, Product, Invoice, Company, Quotation, ProformaInvoice, PaymentRecord, StockAdjustment
     
     # Initialize Motor Client
     client = AsyncIOMotorClient(DATABASE_URL)
@@ -22,6 +22,11 @@ async def init_db():
             User,
             Client,
             Product,
-            Invoice
+            Invoice,
+            Company,
+            Quotation,
+            ProformaInvoice,
+            PaymentRecord,
+            StockAdjustment
         ]
     )

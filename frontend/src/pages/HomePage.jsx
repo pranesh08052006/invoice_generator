@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import API_BASE_URL from '../config';
 import { PlusSquare, Users, Package, FileText, Settings, LogOut } from 'lucide-react';
 
 const NavButton = ({ to, label, icon }) => (
@@ -37,7 +38,7 @@ const HomePage = ({ user, logout }) => {
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    axios.get('http://localhost:8000/dashboard/stats')
+    axios.get(`${API_BASE_URL}/dashboard/stats`)
       .then(res => setStats(res.data))
       .catch(err => console.error(err));
   }, []);

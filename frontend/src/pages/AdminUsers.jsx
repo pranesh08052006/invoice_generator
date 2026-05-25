@@ -14,7 +14,7 @@ const AdminUsers = ({ user }) => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/admin/users');
+      const response = await axios.get('http://3.86.4.100:8000/admin/users');
       setUsers(response.data);
     } catch (err) { console.error(err); }
   };
@@ -24,7 +24,7 @@ const AdminUsers = ({ user }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:8000/admin/users', newUser);
+      await axios.post('http://3.86.4.100:8000/admin/users', newUser);
       setShowModal(false);
       setNewUser({ 
         full_name: '', 
@@ -41,7 +41,7 @@ const AdminUsers = ({ user }) => {
   const handleDelete = async (userId) => {
     if (window.confirm('Are you sure you want to remove this user from the organization?')) {
       try {
-        await axios.delete(`http://localhost:8000/admin/users/${userId}`);
+        await axios.delete(`http://3.86.4.100:8000/admin/users/${userId}`);
         fetchUsers();
       } catch (err) {
         alert('Error removing user');

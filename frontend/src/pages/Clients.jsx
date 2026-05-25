@@ -31,7 +31,7 @@ const Clients = () => {
     try {
       const endpoint = type === 'QUOTATION' ? 'quotations' : type === 'PROFORMA' ? 'proformas' : 'invoices';
       const prefix = type === 'QUOTATION' ? 'QT' : type === 'PROFORMA' ? 'PI' : 'INV';
-      const response = await axios.get(`http://localhost:8000/${endpoint}/${id}/pdf`, { responseType: 'blob' });
+      const response = await axios.get(`http://3.86.4.100:8000/${endpoint}/${id}/pdf`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -49,7 +49,7 @@ const Clients = () => {
       const docList = type === 'QUOTATION' ? quotations : type === 'PROFORMA' ? proformas : invoices;
       const doc = docList.find(i => i.id === id);
       setSelectedInv(doc);
-      const response = await axios.get(`http://localhost:8000/${endpoint}/${id}/pdf`, { responseType: 'blob' });
+      const response = await axios.get(`http://3.86.4.100:8000/${endpoint}/${id}/pdf`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       setPreviewUrl(url);
       setShowPreview(true);
@@ -62,7 +62,7 @@ const Clients = () => {
     try {
       const endpoint = type === 'QUOTATION' ? 'quotations' : type === 'PROFORMA' ? 'proformas' : 'invoices';
       const prefix = type === 'QUOTATION' ? 'QT' : type === 'PROFORMA' ? 'PI' : 'INV';
-      const response = await axios.get(`http://localhost:8000/${endpoint}/${id}/pdf`, { responseType: 'blob' });
+      const response = await axios.get(`http://3.86.4.100:8000/${endpoint}/${id}/pdf`, { responseType: 'blob' });
       const file = new File([response.data], `${prefix}_${number}.pdf`, { type: 'application/pdf' });
       if (navigator.share) {
         await navigator.share({ files: [file], title: `${prefix} ${number}` });
@@ -77,10 +77,10 @@ const Clients = () => {
   const fetchClients = async () => {
     try {
       const [cRes, iRes, qRes, pRes] = await Promise.all([
-        axios.get('http://localhost:8000/clients'),
-        axios.get('http://localhost:8000/invoices'),
-        axios.get('http://localhost:8000/quotations'),
-        axios.get('http://localhost:8000/proformas')
+        axios.get('http://3.86.4.100:8000/clients'),
+        axios.get('http://3.86.4.100:8000/invoices'),
+        axios.get('http://3.86.4.100:8000/quotations'),
+        axios.get('http://3.86.4.100:8000/proformas')
       ]);
       setClients(cRes.data);
       setInvoices(iRes.data);
@@ -229,9 +229,9 @@ const Clients = () => {
       if (whatsappSameAsPhone) payload.whatsapp = payload.mobile;
       
       if (editingId) {
-        await axios.put(`http://localhost:8000/clients/${editingId}`, payload);
+        await axios.put(`http://3.86.4.100:8000/clients/${editingId}`, payload);
       } else {
-        await axios.post('http://localhost:8000/clients', payload);
+        await axios.post('http://3.86.4.100:8000/clients', payload);
       }
       
       closeModal();
@@ -261,7 +261,7 @@ const Clients = () => {
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this customer? This action cannot be undone.')) return;
     try {
-      await axios.delete(`http://localhost:8000/clients/${id}`);
+      await axios.delete(`http://3.86.4.100:8000/clients/${id}`);
       fetchClients();
     } catch (err) {
       alert('Error deleting client');

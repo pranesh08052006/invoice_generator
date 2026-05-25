@@ -96,9 +96,9 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
     const fetchData = async () => {
       try {
         const [cRes, pRes, iRes] = await Promise.all([
-          axios.get('http://localhost:8000/clients'),
-          axios.get('http://localhost:8000/products'),
-          axios.get('http://localhost:8000/invoices')
+          axios.get('http://3.86.4.100:8000/clients'),
+          axios.get('http://3.86.4.100:8000/products'),
+          axios.get('http://3.86.4.100:8000/invoices')
         ]);
         
         // Calculate outstanding balance for each client and sort descending
@@ -192,7 +192,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
     e.preventDefault();
     const payload = { ...newClient };
     if (whatsappSameAsPhone) payload.whatsapp = payload.mobile;
-    const res = await axios.post('http://localhost:8000/clients', payload);
+    const res = await axios.post('http://3.86.4.100:8000/clients', payload);
     setClients([...clients, res.data]);
     setInvoice({...invoice, client_id: res.data.id});
     setShowClientModal(false);
@@ -213,7 +213,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
         gst_percent: parseFloat(newProduct.gst_percent) || 0,
         stock: parseInt(newProduct.stock) || 0
       };
-      const res = await axios.post('http://localhost:8000/products', payload);
+      const res = await axios.post('http://3.86.4.100:8000/products', payload);
       
       const updatedProductsList = [...products, res.data];
       setProducts(updatedProductsList);
@@ -304,9 +304,9 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
         delete payload.invoice_number;
       }
 
-      const res = await axios.post(`http://localhost:8000/${endpointMap[type]}`, payload);
+      const res = await axios.post(`http://3.86.4.100:8000/${endpointMap[type]}`, payload);
       
-      const pdfRes = await axios.get(`http://localhost:8000/${endpointMap[type]}/${res.data.id}/pdf?t=${Date.now()}`, { responseType: 'blob' });
+      const pdfRes = await axios.get(`http://3.86.4.100:8000/${endpointMap[type]}/${res.data.id}/pdf?t=${Date.now()}`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([pdfRes.data], { type: 'application/pdf' }));
       
       setGeneratedId(res.data.id);
@@ -381,7 +381,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
         delete payload.invoice_number;
       }
       
-      const res = await axios.post(`http://localhost:8000/${endpointMap[type]}/preview`, payload, { responseType: 'blob' });
+      const res = await axios.post(`http://3.86.4.100:8000/${endpointMap[type]}/preview`, payload, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       
       setGeneratedId(null);

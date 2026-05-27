@@ -7,6 +7,8 @@ from io import BytesIO
 from models import Invoice
 import datetime
 import os
+import requests
+from urllib.parse import unquote
 
 def num_to_words(num):
     units = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]
@@ -63,21 +65,52 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
     
     # 1. Header Section
     logo_url = business_details.get("logo_url")
-    logo_path = None
     logo_img = None
     
-    if logo_url:
-        filename = os.path.basename(logo_url)
-        p1 = os.path.join("uploads", "logos", filename)
-        p2 = os.path.join("uploads", filename)
-        if os.path.exists(p1):
-            logo_path = p1
-        elif os.path.exists(p2):
-            logo_path = p2
-            
-    if logo_path and os.path.exists(logo_path):
+    # Prioritize default logo if it exists
+    default_logo_path = os.path.join("uploads", "logos", "default_logo.png")
+    if os.path.exists(default_logo_path):
         try:
-            logo_img = Image(logo_path, width=1.0*inch, height=0.5*inch)
+            logo_img = Image(default_logo_path, width=1.5*inch, height=1.0*inch)
+            print("Using default logo: uploads/logos/default_logo.png")
+        except Exception as e:
+            print(f"Error loading default logo: {e}")
+
+    if not logo_img and logo_url:
+        try:
+            # Unquote in case there are %20 etc
+            filename = unquote(os.path.basename(logo_url))
+            p1 = os.path.join("uploads", "logos", filename)
+            p2 = os.path.join("uploads", filename)
+            
+            actual_path = None
+            if os.path.exists(p1):
+                actual_path = p1
+            elif os.path.exists(p2):
+                actual_path = p2
+            
+            if actual_path:
+                print(f"Loading logo from local path: {actual_path}")
+                logo_img = Image(actual_path, width=1.5*inch, height=1.0*inch)
+            else:
+                # If file not found locally, try downloading it if it's a URL
+                if logo_url.startswith("http"):
+                    try:
+                        # Try localhost if the IP is inaccessible from within the server
+                        target_url = logo_url
+                        if "3.86.4.100" in logo_url:
+                            target_url = logo_url.replace("http://3.86.4.100:8000", "http://localhost:8000")
+                        
+                        print(f"Logo not found locally, trying to download from: {target_url}")
+                        r = requests.get(target_url, timeout=5)
+                        if r.status_code == 200:
+                            img_data = BytesIO(r.content)
+                            logo_img = Image(img_data, width=1.5*inch, height=1.0*inch)
+                            print("Logo downloaded and loaded into Image object successfully")
+                        else:
+                            print(f"Failed to download logo. Status: {r.status_code}")
+                    except Exception as down_err:
+                        print(f"Download attempt failed: {down_err}")
         except Exception as e:
             print(f"Error loading logo image: {e}")
 
@@ -89,11 +122,12 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
         Paragraph(f"Email : {business_details.get('email', 'cometomeetme@gmail.com')}", biz_info_style),
     ]
 
-    header_table = Table([[biz_block, logo_img if logo_img else ""]], colWidths=[380, 140])
+    header_table = Table([[biz_block, logo_img if logo_img else ""]], colWidths=[375, 140])
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
         ('LEFTPADDING', (0, 0), (0, 0), 0),
+        ('RIGHTPADDING', (1, 0), (1, 0), 0),
     ]))
     elements.append(header_table)
     elements.append(Spacer(1, 10))
@@ -137,6 +171,7 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
         Paragraph("Item name", table_header_style),
         Paragraph("Qty", ParagraphStyle('THC', fontSize=10, fontName=bold_font, textColor=colors.white, alignment=1)),
         Paragraph("Rate", ParagraphStyle('THR', fontSize=10, fontName=bold_font, textColor=colors.white, alignment=2)),
+        Paragraph("Disc.", ParagraphStyle('THR', fontSize=10, fontName=bold_font, textColor=colors.white, alignment=2)),
         Paragraph("Tax", ParagraphStyle('THR', fontSize=10, fontName=bold_font, textColor=colors.white, alignment=2)),
         Paragraph("Amount", ParagraphStyle('THR', fontSize=10, fontName=bold_font, textColor=colors.white, alignment=2))
     ]
@@ -145,6 +180,7 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
     total_amount = invoice.total_amount
     sub_total = getattr(invoice, 'sub_total', 0)
     total_gst = getattr(invoice, 'total_gst', 0)
+    total_discount_all = 0
 
     for idx, item in enumerate(invoice.items, 1):
         qty = item.quantity or 1
@@ -159,6 +195,7 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
         else:
             line_discount = item.discount_value or 0
             
+        total_discount_all += line_discount
         line_taxable = line_gross - line_discount
         line_gst_amt = (line_taxable * gst_p) / 100
         line_total = line_taxable + line_gst_amt
@@ -168,13 +205,14 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
             Paragraph(item.product_name, table_cell_style),
             Paragraph(str(qty), table_cell_style),
             Paragraph(f"{price:,.2f}", ParagraphStyle('PR', fontName=reg_font, alignment=2)),
+            Paragraph(f"{line_discount:,.2f}", ParagraphStyle('PR', fontName=reg_font, alignment=2)),
             Paragraph(f"{line_gst_amt:,.2f} ({gst_p}%)", ParagraphStyle('PR', fontName=reg_font, alignment=2)),
             Paragraph(f"INR {line_total:,.2f}", ParagraphStyle('PRB', fontName=bold_font, alignment=2))
         ])
 
-    item_data.append(["", Paragraph("Total", table_cell_bold_style), "", "", "", Paragraph(f"INR {total_amount:,.2f}", ParagraphStyle('PRB', fontName=bold_font, alignment=2))])
+    item_data.append(["", Paragraph("Total", table_cell_bold_style), "", "", "", "", Paragraph(f"INR {total_amount:,.2f}", ParagraphStyle('PRB', fontName=bold_font, alignment=2))])
 
-    items_table = Table(item_data, colWidths=[30, 180, 40, 70, 90, 110])
+    items_table = Table(item_data, colWidths=[25, 140, 35, 65, 55, 95, 105])
     items_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), primary_orange),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -200,6 +238,7 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
         Paragraph(f"Bank Account No. : {business_details.get('bank', {}).get('account_no', '500101011467177')}", value_style),
         Paragraph(f"Bank IFSC code : {business_details.get('bank', {}).get('ifsc', 'CIUB0000524')}", value_style),
         Paragraph(f"Account holder's name : {business_details.get('bank', {}).get('account_holder_name', business_details.get('name', 'Saravanan M'))}", value_style),
+        Paragraph(f"UPI ID / GPay : {business_details.get('bank', {}).get('upi_id', 'saravanan@oksbi')}", value_style),
     ]
 
     paid_amount = getattr(invoice, 'paid_amount', 0) or 0
@@ -207,6 +246,7 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
 
     totals_data = [
         [Paragraph("Sub Total", value_style), Paragraph(f"INR {sub_total:,.2f}", ParagraphStyle('PR', fontName=reg_font, alignment=2))],
+        [Paragraph("Total Discount (-)", value_style), Paragraph(f"INR {total_discount_all:,.2f}", ParagraphStyle('PR', fontName=reg_font, alignment=2))],
         [Paragraph("Total Tax (GST)", value_style), Paragraph(f"INR {total_gst:,.2f}", ParagraphStyle('PR', fontName=reg_font, alignment=2))],
         [Paragraph("Total", ParagraphStyle('TotalL', fontSize=10, fontName=bold_font, textColor=colors.white)), 
          Paragraph(f"INR {total_amount:,.2f}", ParagraphStyle('TotalR', fontSize=10, fontName=bold_font, textColor=colors.white, alignment=2))],

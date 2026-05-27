@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE_URL from '../config';
 import { 
@@ -6,7 +7,8 @@ import {
   CreditCard, AlertCircle, Package, Users
 } from 'lucide-react';
 
-const Reports = ({ user }) => {
+const Reports = ({ user, company }) => {
+  const navigate = useNavigate();
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -51,6 +53,92 @@ const Reports = ({ user }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const downloadPDF = (type) => {
+    if (!reportData) return;
+    const printWindow = window.open('', '_blank');
+    const label = type === 'sales' ? 'Client Sales Breakdown' : 'Low Stock Alert';
+    
+    const html = `
+      <html>
+        <head>
+          <title>${label} Report - ${company?.name || 'Digital Viyabari'}</title>
+          <style>
+            body { font-family: 'Segoe UI', system-ui, sans-serif; color: #111827; padding: 40px; margin: 0; }
+            .header { border-bottom: 2px solid #eaedf3; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+            .title { font-size: 24px; font-weight: 800; color: #1e3a8a; margin: 0; }
+            .company-info { text-align: right; }
+            .date { font-size: 12px; color: #6b7280; margin-top: 4px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { padding: 12px 16px; font-size: 11px; font-weight: 700; color: #4b5563; text-transform: uppercase; background-color: #f8fafc; border-bottom: 1px solid #eaedf3; text-align: left; }
+            td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
+            .text-right { text-align: right; }
+            .total-row { background-color: #fafafa; font-weight: 700; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <h1 class="title">${label.toUpperCase()}</h1>
+              <div class="date">Generated on ${new Date().toLocaleDateString('en-IN')}</div>
+            </div>
+            <div class="company-info">
+              <strong style="font-size: 16px;">${company?.name || 'Digital Viyabari'}</strong><br/>
+              <span style="font-size: 12px; color: #6b7280;">${company?.address || ''}</span>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                ${type === 'sales' ? `
+                  <th>Client Name</th>
+                  <th class="text-right">Invoiced Amount</th>
+                  <th class="text-right">Paid Amount</th>
+                  <th class="text-right">Balance</th>
+                ` : `
+                  <th>Product Name</th>
+                  <th>Product ID</th>
+                  <th class="text-right">Current Stock</th>
+                `}
+              </tr>
+            </thead>
+            <tbody>
+              ${type === 'sales' ? reportData.client_breakdown.map(c => `
+                <tr>
+                  <td><strong>${c.name}</strong></td>
+                  <td class="text-right">₹${(c.invoiced || 0).toLocaleString()}</td>
+                  <td class="text-right">₹${(c.paid || 0).toLocaleString()}</td>
+                  <td class="text-right">₹${((c.invoiced || 0) - (c.paid || 0)).toLocaleString()}</td>
+                </tr>
+              `).join('') : reportData.low_stock_products.map(p => `
+                <tr>
+                  <td><strong>${p.name}</strong></td>
+                  <td>${p.id}</td>
+                  <td class="text-right" style="color: ${p.stock <= 5 ? '#ef4444' : '#f59e0b'}">${p.stock} ${p.unit}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+            ${type === 'sales' ? `
+              <tfoot>
+                <tr class="total-row">
+                  <td>TOTAL</td>
+                  <td class="text-right">₹${reportData.total_invoiced.toLocaleString()}</td>
+                  <td class="text-right">₹${reportData.total_revenue.toLocaleString()}</td>
+                  <td class="text-right">₹${reportData.total_outstanding.toLocaleString()}</td>
+                </tr>
+              </tfoot>
+            ` : ''}
+          </table>
+          <script>
+            window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); };
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   if (loading) {
@@ -142,12 +230,20 @@ const Reports = ({ user }) => {
               <Users size={18} style={{ color: 'var(--primary-color)' }} />
               <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#111827', margin: 0 }}>Client Sales Breakdown</h2>
             </div>
-            <button 
-              onClick={() => downloadCSV('sales')}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
-            >
-              <Download size={14} /> Export CSV
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                onClick={() => downloadPDF('sales')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
+              >
+                <FileText size={14} /> Export PDF
+              </button>
+              <button 
+                onClick={() => downloadCSV('sales')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
+              >
+                <Download size={14} /> Export CSV
+              </button>
+            </div>
           </div>
           <div style={{ padding: '0', overflowX: 'auto', maxHeight: '400px', overflowY: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -183,12 +279,20 @@ const Reports = ({ user }) => {
               <Package size={18} style={{ color: '#f59e0b' }} />
               <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#111827', margin: 0 }}>Low Stock Alert</h2>
             </div>
-            <button 
-              onClick={() => downloadCSV('inventory')}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
-            >
-              <Download size={14} /> Export CSV
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                onClick={() => downloadPDF('inventory')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
+              >
+                <FileText size={14} /> Export PDF
+              </button>
+              <button 
+                onClick={() => downloadCSV('inventory')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
+              >
+                <Download size={14} /> Export CSV
+              </button>
+            </div>
           </div>
           <div style={{ padding: '0', overflowX: 'auto', maxHeight: '400px', overflowY: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>

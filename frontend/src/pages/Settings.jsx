@@ -21,6 +21,7 @@ const SettingsPage = ({ fetchCompanyGlobal }) => {
     ifsc: '',
     account_type: 'Current',
     account_holder_name: '',
+    upi_id: '',
     primary_color: '#2563eb',
     secondary_color: '#ffffff',
     signature_url: '',
@@ -463,6 +464,20 @@ const SettingsPage = ({ fetchCompanyGlobal }) => {
                     value={company.account_holder_name || ''} 
                     onChange={e => setCompany({...company, account_holder_name: e.target.value})}
                     placeholder="E.g. Justry Technologies"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>UPI ID / GPay Number</label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <Edit3 size={14} style={{ position: 'absolute', left: '14px', color: '#9ca3af' }} />
+                  <input 
+                    type="text" 
+                    style={{ height: '42px', width: '100%', paddingLeft: '40px', paddingRight: '14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', fontWeight: '500', backgroundColor: '#fdfcfe' }}
+                    value={company.upi_id || ''} 
+                    onChange={e => setCompany({...company, upi_id: e.target.value})}
+                    placeholder="e.g. name@upi or 9876543210"
                   />
                 </div>
               </div>

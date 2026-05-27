@@ -9,6 +9,12 @@ import {
 import axios from 'axios';
 import API_BASE_URL from './config';
 
+// Set global axios defaults on load to prevent refresh race conditions
+const initialToken = localStorage.getItem('token');
+if (initialToken) {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${initialToken}`;
+}
+
 
 // Pages
 import Login from './pages/Login';
@@ -28,6 +34,7 @@ import logo from './assets/logo.png';
 const SidebarLink = ({ to, label, icon: Icon }) => (
   <NavLink 
     to={to} 
+    end
     className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
     style={({ isActive }) => ({
       display: 'flex',
@@ -73,15 +80,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
 
       {/* Sidebar */}
       <aside className={`sidebar ${isMobileMenuOpen ? 'open' : ''}`} style={{
-        width: '260px',
-        backgroundColor: 'var(--secondary-color)',
-        borderRight: '1px solid #eaedf3',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'sticky',
-        top: 0,
-        height: '100vh',
-        zIndex: 100
+        backgroundColor: 'var(--secondary-color)'
       }}>
         {/* Brand Block */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '24px 20px', borderBottom: '1px solid #fafafa' }}>
@@ -211,7 +210,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
           zIndex: 90
         }}>
           {/* Mobile toggle for responsive navigation drawer */}
-          <button className="mobile-toggle" onClick={() => setIsMobileMenuOpen(true)} style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }}>
+          <button className="mobile-toggle" onClick={() => setIsMobileMenuOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }}>
             <Menu size={22} color="#09090b" />
           </button>
 
@@ -405,7 +404,7 @@ const App = () => {
         <AppLayout user={user} logout={logout} company={company} logoVersion={logoVersion}>
           <Routes>
             <Route path="/" element={<Dashboard user={user} />} />
-            <Route path="/clients" element={<Clients user={user} />} />
+            <Route path="/clients" element={<Clients user={user} company={company} />} />
             <Route path="/products" element={<Products user={user} />} />
             <Route path="/invoices" element={<Invoices user={user} />} />
             <Route path="/invoices/new" element={<CreateInvoice key="create-invoice" user={user} type="invoice" />} />
@@ -413,7 +412,7 @@ const App = () => {
             <Route path="/quotations/new" element={<CreateInvoice key="create-quotation" user={user} type="quotation" />} />
             <Route path="/proformas" element={<Proformas user={user} />} />
             <Route path="/proformas/new" element={<CreateInvoice key="create-proforma" user={user} type="proforma" />} />
-            <Route path="/reports" element={<Reports user={user} />} />
+            <Route path="/reports" element={<Reports user={user} company={company} />} />
             <Route path="/settings" element={<SettingsPage user={user} fetchCompanyGlobal={fetchCompany} />} />
             <Route path="/admin/users" element={<AdminUsers user={user} />} />
             <Route path="*" element={<Navigate to="/" />} />

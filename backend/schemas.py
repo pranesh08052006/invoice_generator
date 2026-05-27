@@ -33,6 +33,7 @@ class CompanyCreate(BaseModel):
     ifsc: Optional[str] = None
     account_type: Optional[str] = "Current"
     account_holder_name: Optional[str] = None
+    upi_id: Optional[str] = None
     signature_url: Optional[str] = None
     logo_url: Optional[str] = None
     primary_color: Optional[str] = "#2563eb"
@@ -49,6 +50,7 @@ class CompanyOut(BaseModel):
     ifsc: Optional[str] = None
     account_type: Optional[str] = "Current"
     account_holder_name: Optional[str] = None
+    upi_id: Optional[str] = None
     signature_url: Optional[str] = None
     logo_url: Optional[str] = None
     primary_color: Optional[str] = "#2563eb"

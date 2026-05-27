@@ -5,7 +5,7 @@ import API_BASE_URL from '../config';
 
 import { Search, Plus, Phone, MessageSquare, Hash, X, MapPin, Edit3, Trash2, User, ChevronDown, Layout, Eye, Download, Share2, FileText } from 'lucide-react';
 
-const Clients = () => {
+const Clients = ({ user, company }) => {
   const navigate = useNavigate();
   const [clients, setClients] = useState([]);
   const [invoices, setInvoices] = useState([]);
@@ -28,6 +28,7 @@ const Clients = () => {
     email: '', address: '', shipping_address: '', gst_number: '', state: '' 
   });
   const [whatsappSameAsPhone, setWhatsappSameAsPhone] = useState(true);
+  const [shippingSameAsBilling, setShippingSameAsBilling] = useState(true);
 
   const handleDownload = async (id, number, type = 'INVOICE') => {
     try {
@@ -74,6 +75,18 @@ const Clients = () => {
     } catch (err) {
       alert('Failed to share.');
     }
+  };
+
+  const sendReminder = (client, balance) => {
+    const phoneNumber = client.whatsapp || client.mobile;
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    const finalPhone = cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone;
+    
+    const companyName = company?.name || 'our company';
+    const message = `Dear ${client.company_name},\n\nThis is a friendly reminder regarding your outstanding balance of *₹${balance.toLocaleString()}* with *${companyName}*.\n\nPlease settle this at your earliest convenience. If you have already made the payment, please ignore this message.\n\nThank you!`;
+    
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/${finalPhone}?text=${encodedMessage}`, '_blank');
   };
 
   const fetchClients = async () => {
@@ -613,6 +626,33 @@ const Clients = () => {
                   {/* Actions Column */}
                   <td style={{ padding: '16px 24px', paddingRight: '32px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                      {outstandingBalance > 0 && (
+                        <button 
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); sendReminder(c, outstandingBalance); }}
+                          title="Send Payment Reminder"
+                          style={{
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            color: '#16a34a',
+                            cursor: 'pointer',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.backgroundColor = '#dcfce7';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <MessageSquare size={15} />
+                        </button>
+                      )}
                       <button 
                         type="button"
                         onClick={(e) => { e.stopPropagation(); handleEdit(c); }}
@@ -903,16 +943,51 @@ const Clients = () => {
                         placeholder="Billing address details" 
                         style={{ height: '70px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', resize: 'none' }}
                         value={newClient.address} 
-                        onChange={e => setNewClient({...newClient, address: e.target.value})} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setNewClient(prev => ({
+                            ...prev,
+                            address: val,
+                            shipping_address: shippingSameAsBilling ? val : prev.shipping_address
+                          }));
+                        }}
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Shipping Address</label>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Shipping Address</label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--primary-color)', fontWeight: '700', cursor: 'pointer' }}>
+                          <input 
+                            type="checkbox"
+                            checked={shippingSameAsBilling}
+                            onChange={e => {
+                              const checked = e.target.checked;
+                              setShippingSameAsBilling(checked);
+                              if (checked) {
+                                setNewClient(prev => ({ ...prev, shipping_address: prev.address }));
+                              }
+                            }}
+                            style={{ accentColor: 'var(--primary-color)', cursor: 'pointer' }}
+                          />
+                          Same as Billing
+                        </label>
+                      </div>
                       <textarea 
-                        placeholder="Leave empty if same as billing" 
-                        style={{ height: '70px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', resize: 'none' }}
-                        value={newClient.shipping_address} 
+                        placeholder={shippingSameAsBilling ? "Same as billing address" : "Shipping address details"} 
+                        style={{ 
+                          height: '70px', 
+                          padding: '10px 14px', 
+                          border: '1px solid #e2e8f0', 
+                          borderRadius: '8px', 
+                          fontSize: '14px', 
+                          outline: 'none', 
+                          resize: 'none',
+                          backgroundColor: shippingSameAsBilling ? '#f8fafc' : '#ffffff',
+                          color: shippingSameAsBilling ? '#6b7280' : '#111827'
+                        }}
+                        value={shippingSameAsBilling ? newClient.address : newClient.shipping_address} 
                         onChange={e => setNewClient({...newClient, shipping_address: e.target.value})} 
+                        disabled={shippingSameAsBilling}
                       />
                     </div>
                   </div>

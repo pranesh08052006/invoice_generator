@@ -5,7 +5,7 @@ import API_BASE_URL from '../config';
 
 import { 
   Plus, Trash2, X, Package, ChevronDown, UserPlus, Info, 
-  Save, FileText, Layout, Download, Share2, CheckCircle, Eye, Send
+  Save, FileText, Layout, Download, Share2, CheckCircle, Eye, Send, Calendar
 } from 'lucide-react';
 
 const CreateInvoice = ({ user, type = 'invoice' }) => {
@@ -27,6 +27,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
     email: '', address: '', shipping_address: '', gst_number: '', state: '' 
   });
   const [whatsappSameAsPhone, setWhatsappSameAsPhone] = useState(true);
+  const [shippingSameAsBilling, setShippingSameAsBilling] = useState(true);
   
   const [categories, setCategories] = useState(['Product', 'Service', 'Parts', 'General']);
   const [units, setUnits] = useState(['Units', 'Pcs', 'Hrs', 'Nos', 'Kg', 'Ltr', 'Mtr']);
@@ -44,7 +45,12 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
   const [invoice, setInvoice] = useState({ 
     client_id: '', 
     invoice_number: `${getPrefix()}-${Date.now().toString().slice(-4)}`, 
-    date: new Date().toISOString().split('T')[0], 
+    date: (() => {
+      const d = new Date();
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      return `${dd}-${mm}-${d.getFullYear()}`;
+    })(),
     discount_type: 'percentage',
     discount_value: 0, 
     paid_amount: 0, 
@@ -72,7 +78,10 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
   const [dueDate, setDueDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 15);
-    return d.toISOString().split('T')[0];
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
   });
   
   const [showDeliveryDetails, setShowDeliveryDetails] = useState(false);
@@ -194,15 +203,23 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
     e.preventDefault();
     const payload = { ...newClient };
     if (whatsappSameAsPhone) payload.whatsapp = payload.mobile;
-    const res = await axios.post(`${API_BASE_URL}/clients`, payload);
-    setClients([...clients, res.data]);
-    setInvoice({...invoice, client_id: res.data.id});
-    setShowClientModal(false);
-    setNewClient({ 
-      company_name: '', contact_person: '', mobile: '', whatsapp: '', 
-      email: '', address: '', shipping_address: '', gst_number: '', state: '' 
-    });
-    setWhatsappSameAsPhone(true);
+    if (shippingSameAsBilling) payload.shipping_address = payload.address;
+    
+    try {
+      const res = await axios.post(`${API_BASE_URL}/clients`, payload);
+      setClients([...clients, res.data]);
+      setInvoice({...invoice, client_id: res.data.id});
+      setShowClientModal(false);
+      setNewClient({ 
+        company_name: '', contact_person: '', mobile: '', whatsapp: '', 
+        email: '', address: '', shipping_address: '', gst_number: '', state: '' 
+      });
+      setWhatsappSameAsPhone(true);
+      setShippingSameAsBilling(true);
+    } catch (err) {
+      console.error("FAILED TO SAVE QUICK CLIENT:", err);
+      alert("Error saving customer profile");
+    }
   };
 
   const handleQuickProductSave = async (e) => {
@@ -329,7 +346,12 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
     setInvoice({ 
       client_id: '', 
       invoice_number: `${getPrefix()}-${Date.now().toString().slice(-4)}`, 
-      date: new Date().toISOString().split('T')[0], 
+      date: (() => {
+        const d = new Date();
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        return `${dd}-${mm}-${d.getFullYear()}`;
+      })(),
       discount_type: 'percentage',
       discount_value: 0, 
       paid_amount: 0, 
@@ -347,7 +369,10 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
     
     const d = new Date();
     d.setDate(d.getDate() + 15);
-    setDueDate(d.toISOString().split('T')[0]);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    setDueDate(`${dd}-${mm}-${yyyy}`);
     setShowDeliveryDetails(false);
   };
 
@@ -395,6 +420,52 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDueDateChange = (e) => {
+    const val = e.target.value;
+    
+    // Automatically fall back to free text if they type letters
+    if (/[a-zA-Z]/.test(val)) {
+      setDueDate(val);
+      return;
+    }
+
+    const digits = val.replace(/\D/g, '');
+    if (!digits) {
+      setDueDate(val);
+      return;
+    }
+
+    let formatted = digits;
+    if (formatted.length > 2) {
+      formatted = formatted.slice(0, 2) + '-' + formatted.slice(2);
+    }
+    if (formatted.length > 5) {
+      formatted = formatted.slice(0, 5) + '-' + formatted.slice(5, 9);
+    }
+    setDueDate(formatted);
+  };
+
+  const handleIssueDateChange = (e) => {
+    const val = e.target.value;
+    if (/[a-zA-Z]/.test(val)) {
+      setInvoice({...invoice, date: val});
+      return;
+    }
+    const digits = val.replace(/\D/g, '');
+    if (!digits) {
+      setInvoice({...invoice, date: val});
+      return;
+    }
+    let formatted = digits;
+    if (formatted.length > 2) {
+      formatted = formatted.slice(0, 2) + '-' + formatted.slice(2);
+    }
+    if (formatted.length > 5) {
+      formatted = formatted.slice(0, 5) + '-' + formatted.slice(5, 9);
+    }
+    setInvoice({...invoice, date: formatted});
   };
 
   return (
@@ -568,45 +639,91 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
               {/* Issue Date */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Issue Date</label>
-                <input 
-                  type="date" 
-                  style={{
-                    height: '42px',
-                    padding: '10px 14px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    backgroundColor: '#ffffff',
-                    color: '#111827',
-                    outline: 'none',
-                    width: '100%',
-                    cursor: 'pointer'
-                  }}
-                  value={invoice.date} 
-                  onChange={e => setInvoice({...invoice, date: e.target.value})} 
-                />
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input 
+                    type="text" 
+                    placeholder="dd-mm-yyyy"
+                    style={{
+                      height: '42px',
+                      padding: '10px 42px 10px 14px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      backgroundColor: '#ffffff',
+                      color: '#111827',
+                      outline: 'none',
+                      width: '100%',
+                      cursor: 'text'
+                    }}
+                    value={invoice.date} 
+                    onChange={handleIssueDateChange} 
+                  />
+                  <div style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)', width: '34px', height: '34px' }}>
+                    <Calendar size={18} style={{ color: '#9ca3af', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }} />
+                    <input 
+                      type="date"
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        opacity: 0,
+                        cursor: 'pointer',
+                        width: '100%',
+                        height: '100%'
+                      }}
+                      onChange={e => {
+                        if (e.target.value) {
+                          const [yyyy, mm, dd] = e.target.value.split('-');
+                          setInvoice({...invoice, date: `${dd}-${mm}-${yyyy}`});
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Due Date */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Due Date</label>
-                <input 
-                  type="date" 
-                  style={{
-                    height: '42px',
-                    padding: '10px 14px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    backgroundColor: '#ffffff',
-                    color: '#111827',
-                    outline: 'none',
-                    width: '100%',
-                    cursor: 'pointer'
-                  }}
-                  value={dueDate} 
-                  onChange={e => setDueDate(e.target.value)} 
-                />
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input 
+                    type="text" 
+                    placeholder="dd-mm-yyyy"
+                    style={{
+                      height: '42px',
+                      padding: '10px 42px 10px 14px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      backgroundColor: '#ffffff',
+                      color: '#111827',
+                      outline: 'none',
+                      width: '100%',
+                      cursor: 'text'
+                    }}
+                    value={dueDate} 
+                    onChange={handleDueDateChange} 
+                  />
+                  <div style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)', width: '34px', height: '34px' }}>
+                    <Calendar size={18} style={{ color: '#9ca3af', position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }} />
+                    <input 
+                      type="date"
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        opacity: 0,
+                        cursor: 'pointer',
+                        width: '100%',
+                        height: '100%'
+                      }}
+                      onChange={e => {
+                        if (e.target.value) {
+                          const [yyyy, mm, dd] = e.target.value.split('-');
+                          setDueDate(`${dd}-${mm}-${yyyy}`);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -705,6 +822,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
                             <select 
                               style={{
                                 width: '100%',
+                                minWidth: '150px',
                                 border: '1px solid transparent',
                                 borderRadius: '6px',
                                 padding: '8px 24px 8px 8px',
@@ -741,6 +859,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
                             type="number" 
                             style={{
                               width: '100%',
+                              minWidth: '60px',
                               border: '1px solid transparent',
                               borderRadius: '6px',
                               padding: '8px',
@@ -771,6 +890,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
                             type="number" 
                             style={{
                               width: '100%',
+                              minWidth: '80px',
                               border: '1px solid transparent',
                               borderRadius: '6px',
                               padding: '8px',
@@ -801,6 +921,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
                             type="number" 
                             style={{
                               width: '100%',
+                              minWidth: '60px',
                               border: '1px solid transparent',
                               borderRadius: '6px',
                               padding: '8px',
@@ -831,6 +952,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
                             type="number" 
                             style={{
                               width: '100%',
+                              minWidth: '60px',
                               border: '1px solid #e2e8f0',
                               borderRadius: '6px',
                               padding: '8px',
@@ -863,6 +985,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
                             type="number" 
                             style={{
                               width: '100%',
+                              minWidth: '80px',
                               border: '1px solid #e2e8f0',
                               borderRadius: '6px',
                               padding: '8px',
@@ -891,7 +1014,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
 
                         {/* Amount */}
                         <td style={{ padding: '12px 18px', paddingRight: '32px', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px', minWidth: '90px' }}>
                             <span style={{ fontWeight: '800', fontSize: '13px', color: '#111827' }}>
                               ₹{lineAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
@@ -1327,155 +1450,226 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
         </div>
       </div>
 
-      {/* Quick Customer Addition Drawer Modal */}
+      {/* Quick Customer Addition Drawer */}
       {showClientModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 9999, padding: '20px'
-        }}>
-          <div className="no-scrollbar" style={{
-            backgroundColor: '#ffffff', borderRadius: '16px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            border: '1px solid #eaedf3', width: '100%', maxWidth: '700px',
-            maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column'
+        <div 
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end',
+            zIndex: 9999
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowClientModal(false); }}
+        >
+          <div style={{
+            backgroundColor: '#ffffff', height: '100vh', width: '100%', maxWidth: '580px',
+            boxShadow: '-10px 0 25px -5px rgba(0, 0, 0, 0.1), -5px 0 10px -5px rgba(0, 0, 0, 0.04)',
+            borderLeft: '1px solid #eaedf3', display: 'flex', flexDirection: 'column',
+            animation: 'slideInRight 0.25s ease-out', overflow: 'hidden'
           }}>
-            <div style={{ padding: '24px 32px', borderBottom: '1px solid #eaedf3', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '-0.02em', color: '#111827', margin: 0 }}>Quick Add Customer</h2>
+            {/* Header */}
+            <div style={{ 
+               padding: '24px 32px', 
+               borderBottom: '1px solid #eaedf3', 
+               display: 'flex', 
+               justifyContent: 'space-between', 
+               alignItems: 'center',
+               backgroundColor: '#ffffff'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <UserPlus size={18} style={{ color: 'var(--primary-color)' }} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '16px', fontWeight: '800', letterSpacing: '-0.02em', color: '#111827', margin: 0 }}>
+                    Quick Add Customer
+                  </h2>
+                </div>
+              </div>
               <button 
+                type="button"
                 onClick={() => setShowClientModal(false)} 
                 style={{ padding: '8px', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', color: '#9ca3af', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
                 <X size={20} />
               </button>
             </div>
-            <div style={{ padding: '32px' }}>
-              <form onSubmit={handleQuickClientSave}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563' }}>Company Name *</label>
-                    <input 
-                      placeholder="Legal Entity Name" 
-                      style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
-                      value={newClient.company_name} 
-                      onChange={e => setNewClient({...newClient, company_name: e.target.value})} 
-                      required 
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563' }}>Contact Person Name</label>
-                    <input 
-                      placeholder="Primary Contact" 
-                      style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
-                      value={newClient.contact_person} 
-                      onChange={e => setNewClient({...newClient, contact_person: e.target.value})} 
-                    />
-                  </div>
-                </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563' }}>Phone Number *</label>
-                    <input 
-                      placeholder="+91..." 
-                      style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
-                      value={newClient.mobile} 
-                      onChange={e => {
-                        const val = e.target.value;
-                        setNewClient(prev => ({
-                          ...prev,
-                          mobile: val,
-                          whatsapp: whatsappSameAsPhone ? val : prev.whatsapp
-                        }));
-                      }}
-                      required 
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563' }}>WhatsApp Number</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* Scrollable Form Body without browser scrollbar */}
+            <div className="no-scrollbar" style={{ padding: '24px 32px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <form onSubmit={handleQuickClientSave} id="quick-client-form" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                
+                {/* Section 1: Identity & Contact */}
+                <div>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '12px' }}>Identity & Contact</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Company Name *</label>
                       <input 
-                        placeholder="WhatsApp contact" 
-                        style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: whatsappSameAsPhone ? '#f8fafc' : '#ffffff' }}
-                        value={whatsappSameAsPhone ? newClient.mobile : newClient.whatsapp} 
-                        onChange={e => setNewClient({...newClient, whatsapp: e.target.value})}
-                        disabled={whatsappSameAsPhone}
+                        placeholder="Legal Entity Name" 
+                        style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                        value={newClient.company_name} 
+                        onChange={e => setNewClient({...newClient, company_name: e.target.value})} 
+                        required 
                       />
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#6b7280', cursor: 'pointer' }}>
+                    </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Contact Person</label>
                         <input 
-                          type="checkbox" 
-                          checked={whatsappSameAsPhone} 
-                          onChange={e => {
-                            const checked = e.target.checked;
-                            setWhatsappSameAsPhone(checked);
-                            if (checked) {
-                              setNewClient(prev => ({ ...prev, whatsapp: prev.mobile }));
-                            }
-                          }} 
+                          placeholder="Primary Name" 
+                          style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                          value={newClient.contact_person} 
+                          onChange={e => setNewClient({...newClient, contact_person: e.target.value})} 
                         />
-                        Same as phone number
-                      </label>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Email Address</label>
+                        <input 
+                          placeholder="billing@email.com" 
+                          style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                          value={newClient.email} 
+                          onChange={e => setNewClient({...newClient, email: e.target.value})} 
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Mobile Number *</label>
+                        <input 
+                          placeholder="+91..." 
+                          style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                          value={newClient.mobile} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            setNewClient(prev => ({
+                              ...prev,
+                              mobile: val,
+                              whatsapp: whatsappSameAsPhone ? val : prev.whatsapp
+                            }));
+                          }}
+                          required 
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>WhatsApp</label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--primary-color)', fontWeight: '700', cursor: 'pointer' }}>
+                            <input type="checkbox" checked={whatsappSameAsPhone} onChange={e => {
+                              const checked = e.target.checked;
+                              setWhatsappSameAsPhone(checked);
+                              if (checked) setNewClient(prev => ({ ...prev, whatsapp: prev.mobile }));
+                            }} />
+                            SAME
+                          </label>
+                        </div>
+                        <input 
+                          placeholder="WhatsApp number" 
+                          style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: whatsappSameAsPhone ? '#f8fafc' : '#ffffff' }}
+                          value={whatsappSameAsPhone ? newClient.mobile : newClient.whatsapp} 
+                          onChange={e => setNewClient({...newClient, whatsapp: e.target.value})}
+                          disabled={whatsappSameAsPhone}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563' }}>Email ID</label>
-                    <input 
-                      placeholder="billing@client.com" type="email" 
-                      style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
-                      value={newClient.email} 
-                      onChange={e => setNewClient({...newClient, email: e.target.value})} 
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563' }}>State Name *</label>
-                    <input 
-                      placeholder="State of Jurisdiction" 
-                      style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
-                      value={newClient.state} 
-                      onChange={e => setNewClient({...newClient, state: e.target.value})} 
-                      required 
-                    />
+                {/* Section 2: Address Details */}
+                <div>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '12px' }}>Location & Taxation</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>State / Jurisdiction *</label>
+                      <input 
+                        placeholder="e.g. Tamil Nadu" 
+                        style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                        value={newClient.state} 
+                        onChange={e => setNewClient({...newClient, state: e.target.value})} 
+                        required 
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Billing Address</label>
+                      <textarea 
+                        placeholder="Enter full billing address..." 
+                        style={{ height: '70px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', resize: 'none' }}
+                        value={newClient.address} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setNewClient(prev => ({
+                            ...prev,
+                            address: val,
+                            shipping_address: shippingSameAsBilling ? val : prev.shipping_address
+                          }));
+                        }} 
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Shipping Address</label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--primary-color)', fontWeight: '700', cursor: 'pointer' }}>
+                          <input type="checkbox" checked={shippingSameAsBilling} onChange={e => {
+                            const checked = e.target.checked;
+                            setShippingSameAsBilling(checked);
+                            if (checked) setNewClient(prev => ({ ...prev, shipping_address: prev.address }));
+                          }} />
+                          SAME AS BILLING
+                        </label>
+                      </div>
+                      <textarea 
+                        placeholder="Leave empty if same as billing" 
+                        style={{ height: '70px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', resize: 'none', backgroundColor: shippingSameAsBilling ? '#f8fafc' : '#ffffff' }}
+                        value={shippingSameAsBilling ? newClient.address : newClient.shipping_address} 
+                        onChange={e => setNewClient({...newClient, shipping_address: e.target.value})} 
+                        disabled={shippingSameAsBilling}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '32px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563' }}>Billing Address</label>
-                    <textarea 
-                      placeholder="Main billing address" 
-                      style={{ height: '80px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', resize: 'none' }}
-                      value={newClient.address} 
-                      onChange={e => setNewClient({...newClient, address: e.target.value})} 
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: '#4b5563' }}>Shipping Address</label>
-                    <textarea 
-                      placeholder="Leave empty if same as billing" 
-                      style={{ height: '80px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', resize: 'none' }}
-                      value={newClient.shipping_address} 
-                      onChange={e => setNewClient({...newClient, shipping_address: e.target.value})} 
-                    />
-                  </div>
+                {/* Live Preview */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #f8fafc 0%, var(--primary-light) 100%)',
+                  border: '1px solid #eaedf3',
+                  borderRadius: '12px',
+                  padding: '16px',
+                }}>
+                  <div style={{ fontSize: '9px', fontWeight: '800', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Customer Preview</div>
+                  <div style={{ fontWeight: '700', color: '#111827', fontSize: '13px' }}>{newClient.company_name || 'Legal Entity Name'}</div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>{newClient.mobile ? `+91 ${newClient.mobile}` : 'Contact detail will appear here'}</div>
                 </div>
 
-                <button 
-                  type="submit" 
-                  style={{
-                    width: '100%', height: '48px', backgroundColor: 'var(--primary-color)', color: '#ffffff',
-                    border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '700',
-                    cursor: 'pointer', transition: 'all 0.15s ease'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-hover)'}
-                  onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--primary-color)'}
-                >
-                  Create Profile & Select
-                </button>
               </form>
+            </div>
+
+            {/* Footer */}
+            <div style={{ 
+              padding: '20px 32px', 
+              borderTop: '1px solid #eaedf3', 
+              backgroundColor: '#ffffff',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px'
+            }}>
+              <button 
+                type="button" 
+                style={{ padding: '8px 20px', fontSize: '13px', fontWeight: '700', color: '#4b5563', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer' }} 
+                onClick={() => setShowClientModal(false)}
+              >
+                Discard
+              </button>
+              <button 
+                type="submit" 
+                form="quick-client-form" 
+                style={{ padding: '8px 28px', backgroundColor: 'var(--primary-color)', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: 'pointer' }}
+              >
+                Create & Select
+              </button>
             </div>
           </div>
         </div>
@@ -1483,26 +1677,29 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
 
       {/* Quick Product Addition Modal */}
       {showProductModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 9999, padding: '20px'
-        }}>
-          <div className="no-scrollbar" style={{
-            backgroundColor: '#ffffff', borderRadius: '16px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            border: '1px solid #eaedf3', width: '100%', maxWidth: '600px',
-            maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column'
+        <div 
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end',
+            zIndex: 9999
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowProductModal(false); }}
+        >
+          <div style={{
+            backgroundColor: '#ffffff', height: '100vh', width: '100%', maxWidth: '580px',
+            boxShadow: '-10px 0 25px -5px rgba(0, 0, 0, 0.1), -5px 0 10px -5px rgba(0, 0, 0, 0.04)',
+            borderLeft: '1px solid #eaedf3', display: 'flex', flexDirection: 'column',
+            animation: 'slideInRight 0.25s ease-out', overflow: 'hidden'
           }}>
             {/* Header */}
             <div style={{ 
-              padding: '24px 32px', 
-              borderBottom: '1px solid #eaedf3', 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              backgroundColor: '#ffffff'
+               padding: '24px 32px', 
+               borderBottom: '1px solid #eaedf3', 
+               display: 'flex', 
+               justifyContent: 'space-between', 
+               alignItems: 'center',
+               backgroundColor: '#ffffff'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '36px', height: '36px', borderRadius: '8px', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1524,234 +1721,173 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
             </div>
 
             {/* Scrollable Form Body without browser scrollbar */}
-            <div className="no-scrollbar" style={{ padding: '32px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '28px' }}>
-              <form onSubmit={handleQuickProductSave} id="quick-product-form" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+            <div className="no-scrollbar" style={{ padding: '24px 32px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <form onSubmit={handleQuickProductSave} id="quick-product-form" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 
-                {/* Section 1: Basic info */}
+                {/* Section 1: Item Identity */}
                 <div>
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '16px' }}>Basic Information</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '16px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '12px' }}>Product Identity</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Item Name *</label>
                       <input 
-                        placeholder="e.g. Keyboard" 
+                        placeholder="e.g. Premium Wireless Keyboard" 
                         style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
                         value={newProduct.name} 
                         onChange={e => setNewProduct({...newProduct, name: e.target.value})} 
                         required 
                       />
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Category</label>
-                        <button type="button" onClick={() => { setShowAddCategory(true); setShowAddUnit(false); }}
-                          style={{ width: '20px', height: '20px', borderRadius: '4px', border: '1px solid var(--primary-color)', backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
-                          title="Add new category"
-                        ><Plus size={12} /></button>
-                      </div>
-                      {showAddCategory && (
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <input
-                            autoFocus
-                            placeholder="New category..."
-                            value={newCategoryInput}
-                            onChange={e => setNewCategoryInput(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const val = newCategoryInput.trim();
-                                if (val && !categories.includes(val)) setCategories(prev => [...prev, val]);
-                                if (val) setNewProduct(p => ({ ...p, category: val }));
-                                setNewCategoryInput(''); setShowAddCategory(false);
-                              }
-                              if (e.key === 'Escape') { setShowAddCategory(false); setNewCategoryInput(''); }
-                            }}
-                            style={{ flex: 1, height: '34px', padding: '0 10px', border: '1px solid var(--primary-color)', borderRadius: '6px', fontSize: '13px', outline: 'none' }}
-                          />
-                          <button type="button" onClick={() => {
-                            const val = newCategoryInput.trim();
-                            if (val && !categories.includes(val)) setCategories(prev => [...prev, val]);
-                            if (val) setNewProduct(p => ({ ...p, category: val }));
-                            setNewCategoryInput(''); setShowAddCategory(false);
-                          }} style={{ height: '34px', padding: '0 10px', backgroundColor: 'var(--primary-color)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Add</button>
-                          <button type="button" onClick={() => { setShowAddCategory(false); setNewCategoryInput(''); }} style={{ height: '34px', padding: '0 8px', backgroundColor: '#f1f5f9', color: '#6b7280', border: 'none', borderRadius: '6px', cursor: 'pointer' }}><X size={14} /></button>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Category</label>
+                          <button type="button" onClick={() => setShowAddCategory(true)}
+                            style={{ width: '18px', height: '18px', borderRadius: '4px', border: 'none', backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                          ><Plus size={10} /></button>
                         </div>
-                      )}
-                      <select 
-                        style={{ height: '42px', padding: '0 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#ffffff' }}
-                        value={newProduct.category} 
-                        onChange={e => setNewProduct({...newProduct, category: e.target.value})}
-                      >
-                        <option value="">Select</option>
-                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Unit</label>
-                        <button type="button" onClick={() => { setShowAddUnit(true); setShowAddCategory(false); }}
-                          style={{ width: '20px', height: '20px', borderRadius: '4px', border: '1px solid var(--primary-color)', backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
-                          title="Add new unit"
-                        ><Plus size={12} /></button>
+                        {showAddCategory ? (
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <input 
+                              autoFocus
+                              placeholder="New..."
+                              style={{ flex: 1, height: '34px', padding: '0 8px', border: '1px solid var(--primary-color)', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                              value={newCategoryInput}
+                              onChange={e => setNewCategoryInput(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const val = newCategoryInput.trim();
+                                  if (val && !categories.includes(val)) {
+                                    setCategories(prev => [...prev, val]);
+                                    setNewProduct(p => ({ ...p, category: val }));
+                                  }
+                                  setNewCategoryInput(''); setShowAddCategory(false);
+                                }
+                                if (e.key === 'Escape') setShowAddCategory(false);
+                              }}
+                            />
+                            <button type="button" onClick={() => setShowAddCategory(false)} style={{ height: '34px', padding: '0 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px' }}><X size={12} /></button>
+                          </div>
+                        ) : (
+                          <select 
+                            style={{ height: '42px', padding: '0 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#ffffff' }}
+                            value={newProduct.category} 
+                            onChange={e => setNewProduct({...newProduct, category: e.target.value})}
+                          >
+                            <option value="">General</option>
+                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        )}
                       </div>
-                      {showAddUnit && (
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <input
-                            autoFocus
-                            placeholder="New unit..."
-                            value={newUnitInput}
-                            onChange={e => setNewUnitInput(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const val = newUnitInput.trim();
-                                if (val && !units.includes(val)) setUnits(prev => [...prev, val]);
-                                if (val) setNewProduct(p => ({ ...p, unit: val }));
-                                setNewUnitInput(''); setShowAddUnit(false);
-                              }
-                              if (e.key === 'Escape') { setShowAddUnit(false); setNewUnitInput(''); }
-                            }}
-                            style={{ flex: 1, height: '34px', padding: '0 10px', border: '1px solid var(--primary-color)', borderRadius: '6px', fontSize: '13px', outline: 'none' }}
-                          />
-                          <button type="button" onClick={() => {
-                            const val = newUnitInput.trim();
-                            if (val && !units.includes(val)) setUnits(prev => [...prev, val]);
-                            if (val) setNewProduct(p => ({ ...p, unit: val }));
-                            setNewUnitInput(''); setShowAddUnit(false);
-                          }} style={{ height: '34px', padding: '0 10px', backgroundColor: 'var(--primary-color)', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>Add</button>
-                          <button type="button" onClick={() => { setShowAddUnit(false); setNewUnitInput(''); }} style={{ height: '34px', padding: '0 8px', backgroundColor: '#f1f5f9', color: '#6b7280', border: 'none', borderRadius: '6px', cursor: 'pointer' }}><X size={14} /></button>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Unit</label>
+                          <button type="button" onClick={() => setShowAddUnit(true)}
+                            style={{ width: '18px', height: '18px', borderRadius: '4px', border: 'none', backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                          ><Plus size={10} /></button>
                         </div>
-                      )}
-                      <select 
-                        style={{ height: '42px', padding: '0 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#ffffff' }}
-                        value={newProduct.unit} 
-                        onChange={e => setNewProduct({...newProduct, unit: e.target.value})}
-                      >
-                        {units.map(u => <option key={u} value={u}>{u}</option>)}
-                      </select>
+                        {showAddUnit ? (
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <input 
+                              autoFocus 
+                              placeholder="New..."
+                              style={{ flex: 1, height: '34px', padding: '0 8px', border: '1px solid var(--primary-color)', borderRadius: '6px', fontSize: '12px', outline: 'none' }}
+                              value={newUnitInput}
+                              onChange={e => setNewUnitInput(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const val = newUnitInput.trim();
+                                  if (val && !units.includes(val)) {
+                                    setUnits(prev => [...prev, val]);
+                                    setNewProduct(p => ({ ...p, unit: val }));
+                                  }
+                                  setNewUnitInput(''); setShowAddUnit(false);
+                                }
+                                if (e.key === 'Escape') setShowAddUnit(false);
+                              }}
+                            />
+                            <button type="button" onClick={() => setShowAddUnit(false)} style={{ height: '34px', padding: '0 8px', background: '#f1f5f9', border: 'none', borderRadius: '6px' }}><X size={12} /></button>
+                          </div>
+                        ) : (
+                          <select 
+                            style={{ height: '42px', padding: '0 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', backgroundColor: '#ffffff' }}
+                            value={newProduct.unit} 
+                            onChange={e => setNewProduct({...newProduct, unit: e.target.value})}
+                          >
+                            {units.map(u => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Section 2: Codes & inventory */}
+                {/* Section 2: Pricing & Inventory */}
                 <div>
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '16px' }}>Inventory</span>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '12px' }}>Pricing & Inventory</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Sale Price *</label>
+                      <div style={{ display: 'flex', height: '42px' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRight: 'none', borderRadius: '8px 0 0 8px', fontSize: '13px', color: '#6b7280', fontWeight: '700' }}>₹</span>
+                        <input 
+                          type="number"
+                          step="any"
+                          style={{ flex: 1, height: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '0 8px 8px 0', fontSize: '14px', outline: 'none' }}
+                          value={newProduct.price} 
+                          onChange={e => setNewProduct({...newProduct, price: e.target.value})}
+                          required 
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>GST Rate (%)</label>
+                      <div style={{ display: 'flex', height: '42px' }}>
+                        <input 
+                          type="number" 
+                          style={{ flex: 1, height: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px 0 0 8px', fontSize: '14px', outline: 'none' }}
+                          value={newProduct.gst_percent} 
+                          onChange={e => setNewProduct({...newProduct, gst_percent: e.target.value})} 
+                        />
+                        <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: 'none', borderRadius: '0 8px 8px 0', fontSize: '13px', color: '#6b7280', fontWeight: '700' }}>%</span>
+                      </div>
+                    </div>
+                  </div>
+
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>HSN/SAC Code</label>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>HSN Code</label>
                       <input 
-                        placeholder="e.g. 8471" 
+                        placeholder="Optional" 
                         style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
-                        value={newProduct.hsn_code} 
+                        value={newProduct.hsn_code || ''} 
                         onChange={e => setNewProduct({...newProduct, hsn_code: e.target.value})} 
                       />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Current Stock *</label>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Current Stock</label>
                       <input 
                         type="number" 
-                        placeholder="0" 
                         style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
                         value={newProduct.stock} 
-                        onChange={e => setNewProduct({...newProduct, stock: e.target.value})}
-                        required
+                        onChange={e => setNewProduct({...newProduct, stock: e.target.value})} 
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Section 3: Pricing and taxes */}
-                <div>
-                  <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '16px' }}>Pricing & Taxes</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Base Unit Price *</label>
-                      <div style={{ display: 'flex', height: '42px' }}>
-                        <span style={{
-                          display: 'flex', alignItems: 'center', padding: '0 12px',
-                          background: '#f8fafc', border: '1px solid #e2e8f0',
-                          borderRight: 'none', borderRadius: '8px 0 0 8px',
-                          fontSize: '13px', color: '#6b7280', fontWeight: '700'
-                        }}>₹</span>
-                        <input 
-                          type="number" 
-                          placeholder="0.00" 
-                          style={{ flex: 1, height: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '0', fontSize: '14px', outline: 'none' }}
-                          value={newProduct.price} 
-                          onChange={e => setNewProduct({...newProduct, price: e.target.value})}
-                          required
-                        />
-                        <select
-                          style={{ 
-                            height: '100%', padding: '0 12px', border: '1px solid #e2e8f0', 
-                            borderRadius: '0 8px 8px 0', fontSize: '13px', outline: 'none', 
-                            backgroundColor: '#f8fafc', borderLeft: 'none', fontWeight: '700', color: '#4b5563'
-                          }}
-                          value={newProduct.tax_type}
-                          onChange={e => setNewProduct({...newProduct, tax_type: e.target.value})}
-                        >
-                          <option value="without_tax">+ Tax</option>
-                          <option value="with_tax">Incl.</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>GST Rate (%) *</label>
-                      <div style={{ display: 'flex', height: '42px' }}>
-                        <input 
-                          type="number" 
-                          placeholder="18" 
-                          style={{ flex: 1, height: '100%', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px 0 0 8px', fontSize: '14px', outline: 'none' }}
-                          value={newProduct.gst_percent} 
-                          onChange={e => setNewProduct({...newProduct, gst_percent: e.target.value})}
-                          required
-                        />
-                        <span style={{
-                          display: 'flex', alignItems: 'center', padding: '0 12px',
-                          background: '#f8fafc', border: '1px solid #e2e8f0',
-                          borderLeft: 'none', borderRadius: '0 8px 8px 0',
-                          fontSize: '13px', color: '#6b7280', fontWeight: '700'
-                        }}>%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Discount (Optional)</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                      <div style={{ position: 'relative', height: '42px' }}>
-                        <input 
-                          type="number" 
-                          placeholder="Rate in %" 
-                          style={{ width: '100%', height: '100%', padding: '10px 32px 10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
-                          value={newProduct.discount_type === 'percentage' ? newProduct.discount_value : ''} 
-                          onChange={e => setNewProduct({...newProduct, discount_type: 'percentage', discount_value: e.target.value})}
-                        />
-                        <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: '#9ca3af', fontWeight: '700' }}>%</span>
-                      </div>
-                      <div style={{ position: 'relative', height: '42px' }}>
-                        <input 
-                          type="number" 
-                          placeholder="Amount in ₹" 
-                          style={{ width: '100%', height: '100%', padding: '10px 32px 10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
-                          value={newProduct.discount_type === 'amount' ? newProduct.discount_value : ''} 
-                          onChange={e => setNewProduct({...newProduct, discount_type: 'amount', discount_value: e.target.value})}
-                        />
-                        <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '13px', color: '#9ca3af', fontWeight: '700' }}>₹</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section 4: Live Preview details */}
+                {/* Section 3: Live Preview details */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)',
+                  background: 'linear-gradient(135deg, #f8fafc 0%, var(--primary-light) 100%)',
                   border: '1px solid #e2e8f0',
                   borderRadius: '12px',
                   padding: '16px',
                   display: 'grid',
-                  gridTemplateColumns: '1.2fr 1fr 1fr',
+                  gridTemplateColumns: '1.2fr 1fr',
                   gap: '16px'
                 }}>
                   <div>
@@ -1759,12 +1895,8 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
                     <div style={{ fontWeight: '700', color: '#111827', fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{newProduct.name || '—'}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Price</div>
-                    <div style={{ fontWeight: '800', color: '#111827', fontSize: '13px' }}>{newProduct.price ? `₹${Number(newProduct.price).toLocaleString()}` : '—'}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Stock</div>
-                    <div style={{ fontWeight: '700', color: '#111827', fontSize: '13px' }}>{newProduct.stock || 0} {newProduct.unit}</div>
+                    <div style={{ fontSize: '9px', fontWeight: '800', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Unit Price</div>
+                    <div style={{ fontWeight: '700', color: '#111827', fontSize: '13px' }}>₹{parseFloat(newProduct.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                   </div>
                 </div>
 
@@ -1798,7 +1930,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
                   border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: 'pointer'
                 }}
               >
-                Save Item
+                Add Product
               </button>
             </div>
 

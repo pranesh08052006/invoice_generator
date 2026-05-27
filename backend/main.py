@@ -4,6 +4,8 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from typing import List, Optional
 from datetime import datetime, timedelta
 import io
+from bson import ObjectId
+from beanie.operators import In
 
 from database import init_db
 from models import (
@@ -396,6 +398,22 @@ async def delete_product(
     await product.delete()
     return {"message": "Product deleted"}
 
+async def _adjust_stock(items, direction="reduce"):
+    for item in items:
+        if item.product_id:
+            try:
+                db_product = await Product.get(item.product_id)
+                if db_product:
+                    qty = item.quantity or 0
+                    if direction == "reduce":
+                        db_product.stock -= qty
+                    else:
+                        db_product.stock += qty
+                    await db_product.save()
+                    print(f"DEBUG: Adjusted stock for {db_product.name} (ID: {db_product.id}): {direction} {qty}. New stock: {db_product.stock}")
+            except Exception as e:
+                print(f"ERROR adjusting stock for product {item.product_id}: {str(e)}")
+
 # --- INVOICES ---
 @app.post("/invoices")
 async def create_invoice(
@@ -430,12 +448,10 @@ async def create_invoice(
             sub_total += line_taxable_value
             total_gst += line_gst
             
-            if item.product_id:
-                db_product = await Product.get(item.product_id)
-                if db_product:
-                    db_product.stock -= (item.quantity or 0)
-                    await db_product.save()
-            
+        # Adjust Stock
+        await _adjust_stock(invoice_in.items)
+        
+        for item in invoice_in.items:
             items_to_save.append(InvoiceItem(**item.dict()))
 
         # Final Invoice Discount
@@ -521,7 +537,6 @@ async def get_invoices(user: User = Depends(get_current_user)):
         elif user.role == UserRole.ADMIN:
             descendant_ids = await get_all_descendants(str(user.id))
             all_involved_ids = [str(user.id)] + descendant_ids
-            from beanie.operators import In
             invoices = await Invoice.find(In(Invoice.user_id, all_involved_ids)).to_list()
         else:
             invoices = await Invoice.find(Invoice.user_id == str(user.id)).to_list()
@@ -529,11 +544,23 @@ async def get_invoices(user: User = Depends(get_current_user)):
         # Filter out soft-deleted invoices and sort newest first
         invoices = [inv for inv in invoices if not getattr(inv, 'is_deleted', False)]
         invoices.sort(key=lambda x: x.created_at or x.date, reverse=True)
+
+        if not invoices:
+            return []
+
+        # Batch fetch clients and users to avoid N+1 issues
+        client_ids = list(set([inv.client_id for inv in invoices if inv.client_id and len(inv.client_id) == 24]))
+        clients = await Client.find(In(Client.id, [ObjectId(cid) for cid in client_ids])).to_list()
+        client_map = {str(c.id): c for c in clients}
+
+        user_ids = list(set([inv.user_id for inv in invoices if inv.user_id and len(inv.user_id) == 24]))
+        users = await User.find(In(User.id, [ObjectId(uid) for uid in user_ids])).to_list()
+        user_map = {str(u.id): u for u in users}
             
         results = []
         for inv in invoices:
-            creator = await User.get(inv.user_id)
-            client = await Client.get(inv.client_id)
+            creator = user_map.get(inv.user_id)
+            client = client_map.get(inv.client_id)
             results.append({
                 "id": str(inv.id),
                 "invoice_number": inv.invoice_number,
@@ -592,37 +619,7 @@ async def get_pdf(
         # Fetch saved company details, fallback to basic user info
         saved_company = await Company.find_one(Company.user_id == str(invoice.user_id))
         
-        if saved_company:
-            business_details = {
-                "name": saved_company.name,
-                "address": saved_company.address,
-                "email": saved_company.email or user.email,
-                "phone": saved_company.mobile,
-                "gst": saved_company.gst_number,
-                "signature_url": saved_company.signature_url,
-                "bank": {
-                    "bank_name": saved_company.bank_name or "N/A",
-                    "account_no": saved_company.account_no or "N/A",
-                    "ifsc": saved_company.ifsc or "N/A",
-                    "account_type": saved_company.account_type or "Current",
-                    "account_holder_name": saved_company.account_holder_name or saved_company.name
-                }
-            }
-        else:
-            business_details = {
-                "name": (creator.full_name if creator else user.full_name) + " Business",
-                "address": "123 Business Plaza, City, India",
-                "email": creator.email if creator else user.email,
-                "phone": "+91 9876543210",
-                "gst": "33AABCA1234A1Z1",
-                "bank": {
-                    "bank_name": "City Union Bank Limited",
-                    "account_no": "500101011467177",
-                    "ifsc": "CIUB0000524",
-                    "account_type": "Current",
-                    "account_holder_name": creator.full_name if creator else user.full_name
-                }
-            }
+        business_details = _build_business_details(saved_company, creator or user)
         
         client = await Client.get(invoice.client_id)
         if not client:
@@ -706,37 +703,7 @@ async def preview_invoice(
 
         saved_company = await Company.find_one(Company.user_id == str(user.id))
         
-        if saved_company:
-            business_details = {
-                "name": saved_company.name,
-                "address": saved_company.address,
-                "email": saved_company.email or user.email,
-                "phone": saved_company.mobile,
-                "gst": saved_company.gst_number,
-                "signature_url": saved_company.signature_url,
-                "bank": {
-                    "bank_name": saved_company.bank_name or "N/A",
-                    "account_no": saved_company.account_no or "N/A",
-                    "ifsc": saved_company.ifsc or "N/A",
-                    "account_type": saved_company.account_type or "Current",
-                    "account_holder_name": saved_company.account_holder_name or saved_company.name
-                }
-            }
-        else:
-            business_details = {
-                "name": user.full_name + " Business",
-                "address": "123 Business Plaza, City, India",
-                "email": user.email,
-                "phone": "+91 9876543210",
-                "gst": "33AABCA1234A1Z1",
-                "bank": {
-                    "bank_name": "City Union Bank Limited",
-                    "account_no": "500101011467177",
-                    "ifsc": "CIUB0000524",
-                    "account_type": "Current",
-                    "account_holder_name": user.full_name
-                }
-            }
+        business_details = _build_business_details(saved_company, user)
         
         client = await Client.get(mock_invoice.client_id)
         if not client:
@@ -788,6 +755,9 @@ async def update_invoice(
     sub_total = 0
     total_gst = 0
     items_to_save = []
+    # Record old items to revert stock
+    old_items = invoice.items
+    
     for item in invoice_in.items:
         qty = item.quantity or 0
         price = item.price or 0
@@ -802,6 +772,11 @@ async def update_invoice(
         sub_total += line_taxable
         total_gst += line_gst
         items_to_save.append(InvoiceItem(**item.dict()))
+    
+    # Revert old stock impact
+    await _adjust_stock(old_items, direction="add")
+    # Apply new stock impact
+    await _adjust_stock(items_to_save, direction="reduce")
     
     inv_disc = 0
     if invoice_in.discount_type == "percentage":
@@ -905,9 +880,17 @@ async def get_quotations(user: User = Depends(get_current_user)):
             quotations = await Quotation.find(Quotation.user_id == str(user.id)).to_list()
         quotations = [q for q in quotations if not getattr(q, 'is_deleted', False)]
         quotations.sort(key=lambda x: x.created_at, reverse=True)
+
+        if not quotations:
+            return []
+
+        client_ids = list(set([q.client_id for q in quotations if q.client_id and len(q.client_id) == 24]))
+        clients = await Client.find(In(Client.id, [ObjectId(cid) for cid in client_ids])).to_list()
+        client_map = {str(c.id): c for c in clients}
+
         results = []
         for q in quotations:
-            client = await Client.get(q.client_id)
+            client = client_map.get(q.client_id)
             results.append({
                 "id": str(q.id),
                 "quotation_number": q.quotation_number,
@@ -977,6 +960,10 @@ async def convert_quotation_to_invoice(
         status=InvoiceStatus.UNPAID
     )
     await new_invoice.insert()
+    
+    # Adjust stock on conversion from quotation
+    await _adjust_stock(q.items)
+    
     q.status = QuotationStatus.CONVERTED
     await q.save()
     return {"id": str(new_invoice.id), "invoice_number": new_invoice.invoice_number, "total_amount": new_invoice.total_amount}
@@ -1093,9 +1080,17 @@ async def get_proformas(user: User = Depends(get_current_user)):
             proformas = await ProformaInvoice.find(ProformaInvoice.user_id == str(user.id)).to_list()
         proformas = [p for p in proformas if not getattr(p, 'is_deleted', False)]
         proformas.sort(key=lambda x: x.created_at, reverse=True)
+
+        if not proformas:
+            return []
+
+        client_ids = list(set([p.client_id for p in proformas if p.client_id and len(p.client_id) == 24]))
+        clients = await Client.find(In(Client.id, [ObjectId(cid) for cid in client_ids])).to_list()
+        client_map = {str(c.id): c for c in clients}
+
         results = []
         for p in proformas:
-            client = await Client.get(p.client_id)
+            client = client_map.get(p.client_id)
             results.append({
                 "id": str(p.id),
                 "proforma_number": p.proforma_number,
@@ -1167,6 +1162,10 @@ async def convert_proforma_to_invoice(
         status=InvoiceStatus.UNPAID
     )
     await new_invoice.insert()
+    
+    # Adjust stock on conversion from proforma
+    await _adjust_stock(p.items)
+    
     p.status = ProformaStatus.CONVERTED
     await p.save()
     return {"id": str(new_invoice.id), "invoice_number": new_invoice.invoice_number, "total_amount": new_invoice.total_amount}
@@ -1244,6 +1243,7 @@ def _build_business_details(saved_company, user):
             "phone": saved_company.mobile,
             "gst": saved_company.gst_number,
             "signature_url": getattr(saved_company, 'signature_url', None),
+            "logo_url": getattr(saved_company, 'logo_url', None),
             "bank": {
                 "bank_name": saved_company.bank_name or "N/A",
                 "account_no": saved_company.account_no or "N/A",
@@ -1297,9 +1297,17 @@ async def get_stock_adjustments(user: User = Depends(get_current_user)):
     else:
         adjs = await StockAdjustment.find(StockAdjustment.user_id == str(user.id)).to_list()
     adjs.sort(key=lambda x: x.created_at, reverse=True)
+    
+    if not adjs:
+        return []
+
+    product_ids = list(set([a.product_id for a in adjs if a.product_id and len(a.product_id) == 24]))
+    products = await Product.find(In(Product.id, [ObjectId(pid) for pid in product_ids])).to_list()
+    product_map = {str(p.id): p for p in products}
+
     results = []
     for a in adjs:
-        product = await Product.get(a.product_id)
+        product = product_map.get(a.product_id)
         results.append({
             "id": str(a.id),
             "product_id": a.product_id,
@@ -1348,9 +1356,17 @@ async def get_payments(user: User = Depends(get_current_user)):
     else:
         payments = await PaymentRecord.find(PaymentRecord.user_id == str(user.id)).to_list()
     payments.sort(key=lambda x: x.created_at, reverse=True)
+    
+    if not payments:
+        return []
+
+    client_ids = list(set([p.client_id for p in payments if p.client_id and len(p.client_id) == 24]))
+    clients = await Client.find(In(Client.id, [ObjectId(cid) for cid in client_ids])).to_list()
+    client_map = {str(c.id): c for c in clients}
+
     results = []
     for p in payments:
-        client = await Client.get(p.client_id)
+        client = client_map.get(p.client_id)
         results.append({
             "id": str(p.id),
             "client_id": p.client_id,

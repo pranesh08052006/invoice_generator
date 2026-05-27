@@ -32,6 +32,7 @@ class Company(Document):
     ifsc: Optional[str] = None
     account_type: Optional[str] = "Current"
     account_holder_name: Optional[str] = None
+    upi_id: Optional[str] = None
     signature_url: Optional[str] = None
     logo_url: Optional[str] = None
     primary_color: Optional[str] = "#2563eb"
@@ -41,7 +42,7 @@ class Company(Document):
         name = "company_details"
 
 class Client(Document):
-    user_id: str
+    user_id: Indexed(str)
     company_name: str
     contact_person: Optional[str] = None
     mobile: str
@@ -61,7 +62,7 @@ class ItemType(str, Enum):
     SERVICE = "service"
 
 class Product(Document):
-    user_id: str
+    user_id: Indexed(str)
     name: str
     category: Optional[str] = None
     unit: str = "Units"
@@ -99,8 +100,8 @@ class InvoiceItem(BaseModel):
     item_type: str = "product"  # "product" or "service"
 
 class Invoice(Document):
-    user_id: str
-    client_id: str
+    user_id: Indexed(str)
+    client_id: Indexed(str)
     invoice_number: Indexed(str)
     date: datetime = Field(default_factory=datetime.utcnow)
     sub_total: float = 0.0
@@ -135,8 +136,8 @@ class QuotationStatus(str, Enum):
     CONVERTED = "CONVERTED"
 
 class Quotation(Document):
-    user_id: str
-    client_id: str
+    user_id: Indexed(str)
+    client_id: Indexed(str)
     quotation_number: Indexed(str)
     date: datetime = Field(default_factory=datetime.utcnow)
     valid_until: Optional[datetime] = None
@@ -164,8 +165,8 @@ class ProformaStatus(str, Enum):
     CONVERTED = "CONVERTED"
 
 class ProformaInvoice(Document):
-    user_id: str
-    client_id: str
+    user_id: Indexed(str)
+    client_id: Indexed(str)
     proforma_number: Indexed(str)
     date: datetime = Field(default_factory=datetime.utcnow)
     sub_total: float = 0.0
@@ -189,9 +190,9 @@ class ProformaInvoice(Document):
 
 # --- Payment Record Model ---
 class PaymentRecord(Document):
-    user_id: str
-    client_id: str
-    invoice_id: Optional[str] = None
+    user_id: Indexed(str)
+    client_id: Indexed(str)
+    invoice_id: Optional[Indexed(str)] = None
     amount: float
     payment_method: str = "CASH"  # CASH, UPI, BANK_TRANSFER, CARD, custom
     payment_date: datetime = Field(default_factory=datetime.utcnow)
@@ -203,8 +204,8 @@ class PaymentRecord(Document):
 
 # --- Stock Adjustment Model ---
 class StockAdjustment(Document):
-    user_id: str
-    product_id: str
+    user_id: Indexed(str)
+    product_id: Indexed(str)
     adjustment_type: str = "add"  # "add" or "subtract"
     quantity: int
     reason: Optional[str] = None

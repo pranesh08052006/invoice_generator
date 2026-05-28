@@ -18,6 +18,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [showClientModal, setShowClientModal] = useState(false);
   const [showProductModal, setShowProductModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -106,30 +107,43 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [cRes, pRes, iRes] = await Promise.all([
+        const [cRes, pRes, iRes, payRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/clients`),
           axios.get(`${API_BASE_URL}/products`),
-          axios.get(`${API_BASE_URL}/invoices`)
+          axios.get(`${API_BASE_URL}/invoices`),
+          axios.get(`${API_BASE_URL}/payments`)
         ]);
         
+        const allInvoices = iRes.data;
+        const allPayments = payRes.data;
+
         // Calculate outstanding balance for each client and sort descending
         const sortedClients = [...cRes.data].sort((a, b) => {
-          const aInvs = iRes.data.filter(inv => inv.client_id === a.id);
+          const aInvs = allInvoices.filter(inv => inv.client_id === a.id);
           const aBilled = aInvs.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-          const aPaid = aInvs.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
-          const aBal = aBilled - aPaid;
           
-          const bInvs = iRes.data.filter(inv => inv.client_id === b.id);
+          // Total paid = (paid on invoices) + (general payments for this client)
+          const aInvoicePaid = aInvs.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+          const aGeneralPaid = allPayments
+            .filter(p => p.client_id === a.id && !p.invoice_id)
+            .reduce((sum, p) => sum + (p.amount || 0), 0);
+          const aBal = aBilled - (aInvoicePaid + aGeneralPaid);
+          
+          const bInvs = allInvoices.filter(inv => inv.client_id === b.id);
           const bBilled = bInvs.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-          const bPaid = bInvs.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
-          const bBal = bBilled - bPaid;
+          const bInvoicePaid = bInvs.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+          const bGeneralPaid = allPayments
+            .filter(p => p.client_id === b.id && !p.invoice_id)
+            .reduce((sum, p) => sum + (p.amount || 0), 0);
+          const bBal = bBilled - (bInvoicePaid + bGeneralPaid);
           
           return bBal - aBal; // Descending
         });
 
         setClients(sortedClients);
         setProducts(pRes.data);
-        setInvoices(iRes.data);
+        setInvoices(allInvoices);
+        setPayments(allPayments);
       } catch (err) {
         console.error("FAILED TO FETCH DATA:", err);
       }
@@ -196,7 +210,11 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
 
   const selectedClientInvoices = invoices.filter(inv => inv.client_id === invoice.client_id);
   const selectedClientTotal = selectedClientInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-  const selectedClientPaid = selectedClientInvoices.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+  const selectedClientInvoicePaid = selectedClientInvoices.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+  const selectedClientGeneralPaid = payments
+    .filter(p => p.client_id === invoice.client_id && !p.invoice_id)
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+  const selectedClientPaid = selectedClientInvoicePaid + selectedClientGeneralPaid;
   const selectedClientOutstanding = selectedClientTotal - selectedClientPaid;
 
   const handleQuickClientSave = async (e) => {
@@ -332,6 +350,9 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
       setGeneratedNumber(data.invoice_number);
       setPreviewUrl(url);
       setShowPreview(true);
+      
+      // Clear form for next entry
+      resetForm();
     } catch (err) {
       console.error('INVOICE SAVE ERROR:', err);
       alert('Error saving invoice');
@@ -340,9 +361,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
     }
   };
 
-  const handleDiscard = () => {
-    if (!window.confirm("Are you sure you want to discard all changes?")) return;
-    
+  const resetForm = () => {
     setInvoice({ 
       client_id: '', 
       invoice_number: `${getPrefix()}-${Date.now().toString().slice(-4)}`, 
@@ -374,6 +393,11 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
     const dd = String(d.getDate()).padStart(2, '0');
     setDueDate(`${dd}-${mm}-${yyyy}`);
     setShowDeliveryDetails(false);
+  };
+
+  const handleDiscard = () => {
+    if (!window.confirm("Are you sure you want to discard all changes?")) return;
+    resetForm();
   };
 
   const handlePreview = async (e) => {
@@ -557,8 +581,11 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
                       {clients.map(c => {
                         const cInvs = invoices.filter(inv => inv.client_id === c.id);
                         const cBilled = cInvs.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-                        const cPaid = cInvs.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
-                        const cBal = cBilled - cPaid;
+                        const cInvoicePaid = cInvs.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+                        const cGeneralPaid = payments
+                          .filter(p => p.client_id === c.id && !p.invoice_id)
+                          .reduce((sum, p) => sum + (p.amount || 0), 0);
+                        const cBal = cBilled - (cInvoicePaid + cGeneralPaid);
                         const balStr = cBal > 0 ? ` (Due: ₹${cBal.toLocaleString(undefined, { minimumFractionDigits: 2 })})` : '';
                         return (
                           <option key={c.id} value={c.id}>

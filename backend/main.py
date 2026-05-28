@@ -11,8 +11,9 @@ from database import init_db
 from models import (
     User, UserRole, Client, Product, Invoice, InvoiceItem, InvoiceStatus, Company,
     Quotation, QuotationStatus, ProformaInvoice, ProformaStatus,
-    PaymentRecord, StockAdjustment
+    PaymentRecord, StockAdjustment, Subscription, PlanType
 )
+
 from schemas import (
     UserCreate, UserOut, ClientCreate, ClientOut, ProductCreate, ProductOut,
     InvoiceCreate, CompanyCreate, CompanyOut,
@@ -71,28 +72,179 @@ async def get_ancestors(user: User) -> List[str]:
         current = parent
     return ids
 
+async def check_subscription(user: User):
+    # Super Admin is exempt
+    if user.role == UserRole.SUPER_ADMIN:
+        return
+    
+    user_ids = await get_ancestors(user)
+    # Check if any user in the hierarchy has an active subscription
+    sub = await Subscription.find_one(In(Subscription.user_id, user_ids), Subscription.is_active == True)
+    
+    if not sub:
+        # If no subscription record at all for the top-level owner, create a 7-day trial
+        admin_id = user_ids[-1]
+        owner_sub = await Subscription.find_one(Subscription.user_id == admin_id)
+        if not owner_sub:
+            new_sub = Subscription(
+                user_id=admin_id,
+                plan_type=PlanType.FREE_TRIAL,
+                end_date=datetime.utcnow() + timedelta(days=7),
+                is_active=True
+            )
+            await new_sub.insert()
+            return
+        else:
+            # If sub exists but is inactive/expired
+            if owner_sub.end_date < datetime.utcnow():
+                raise HTTPException(
+                    status_code=402, 
+                    detail="Organization subscription expired. Contact Admin."
+                )
+            raise HTTPException(
+                status_code=402, 
+                detail="Subscription inactive. Please contact support."
+            )
+    
+    # Check if currently active sub has expired
+    if sub.end_date < datetime.utcnow():
+        sub.is_active = False
+        await sub.save()
+        raise HTTPException(
+            status_code=402, 
+            detail="Subscription expired. Please renew to continue."
+        )
+
+async def check_employee_restriction(user: User, action_type: str, is_create: bool = True):
+    # Super Admin is exempt from all restrictions
+    if user.role == UserRole.SUPER_ADMIN:
+        return
+    
+    # NEW RULE: Managers (ADMIN) are RESTRICTED from modifying transactional data.
+    # They can view data and manage employees, but cannot create/edit/delete transactions.
+    if user.role == UserRole.ADMIN:
+        if action_type in ["invoice", "product", "client", "quotation", "proforma", "payment"]:
+            raise HTTPException(
+                status_code=403, 
+                detail=f"Administrative Restriction: Managers (Admins) cannot {'create' if is_create else 'modify'} {action_type} data. Please login as a standard user."
+            )
+        return
+
+    # If it's a standard USER (Billing Agent), apply subscription/trial limits
+    if user.role == UserRole.USER:
+        # If explicitly granted full access, allow everything
+        if user.has_full_access:
+            return
+        
+        # If within trial, allow everything for now
+        now = datetime.utcnow()
+        if user.trial_end_date and now <= user.trial_end_date:
+            return
+        
+        # Restricted mode: Only 1 NEW instance per day for each type
+        if is_create:
+            start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            model_map = {
+                "invoice": Invoice,
+                "product": Product,
+                "client": Client,
+                "quotation": Quotation,
+                "payment": PaymentRecord,
+                "proforma": ProformaInvoice
+            }
+            
+            model = model_map.get(action_type)
+            if not model:
+                return
+                
+            count = await model.find(model.user_id == str(user.id), model.created_at >= start_of_day).count()
+            if count >= 1:
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Trial Limit Reached: You can only create 1 {action_type} per day in trial mode. Please upgrade for unlimited access."
+                )
+
+
+from fastapi import Request
+
 # --- AUTH ---
 @app.post("/auth/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     user = await User.find_one(User.email == form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    # Device Login Restriction (Simple IP Tracking)
+    if user.role != UserRole.SUPER_ADMIN:
+        client_ip = request.client.host
+        # If we wanted to be strict: 
+        # if user.last_login_ip and user.last_login_ip != client_ip:
+        #    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Login restricted to your primary device.")
+        user.last_login_ip = client_ip
+        await user.save()
     
     access_token = create_access_token(data={"sub": user.email})
     # Ensure user has a string ID in the response
     user_data = user.dict()
     user_data["id"] = str(user.id)
+    # Ensure trial/access fields are included (pydantic will handle serialization of datetime)
     return {"access_token": access_token, "token_type": "bearer", "user": user_data}
+
 
 @app.get("/auth/me", response_model=UserOut)
 async def get_me(user: User = Depends(get_current_user)):
+    user_data = user.dict()
+    user_data["id"] = str(user.id)
+    return user_data
+
+@app.get("/subscription/me")
+async def get_my_subscription(user: User = Depends(get_current_user)):
+    now = datetime.utcnow()
+
+    # For standard billing agents (USER role), the trial is tracked on the User model directly.
+    if user.role == UserRole.USER:
+        if user.has_full_access:
+            return {
+                "status": "active",
+                "plan": "FULL_ACCESS",
+                "days_left": None,
+                "is_full_access": True
+            }
+        # Check trial_end_date on the user object
+        if user.trial_end_date:
+            days_left = (user.trial_end_date - now).days
+            is_expired = now > user.trial_end_date
+            return {
+                "status": "expired" if is_expired else "active",
+                "plan": "FREE_TRIAL",
+                "end_date": user.trial_end_date,
+                "days_left": max(0, days_left) if not is_expired else 0,
+                "is_expired": is_expired
+            }
+        # No trial date set — treat as expired
+        return {"status": "expired", "plan": "FREE_TRIAL", "days_left": 0, "is_expired": True}
+
+    # For ADMINs and SUPER_ADMINs, look up the Subscription collection
+    user_ids = await get_ancestors(user)
+    sub = await Subscription.find_one(In(Subscription.user_id, user_ids), Subscription.is_active == True)
+    if not sub:
+        admin_id = user_ids[-1]
+        sub = await Subscription.find_one(Subscription.user_id == admin_id)
+    
+    if not sub:
+        return {"status": "inactive", "message": "No subscription found"}
+    
+    is_expired = sub.end_date < now
+    days_left = max(0, (sub.end_date - now).days) if not is_expired else 0
     return {
-        "id": str(user.id),
-        "email": user.email,
-        "full_name": user.full_name,
-        "role": user.role,
-        "created_at": user.created_at
+        "status": "active" if sub.is_active and not is_expired else "expired",
+        "plan": sub.plan_type,
+        "end_date": sub.end_date,
+        "days_left": days_left,
+        "is_expired": is_expired
     }
+
 
 # --- ADMIN MANAGEMENT ---
 @app.post("/admin/users", response_model=UserOut)
@@ -111,21 +263,27 @@ async def create_managed_user(
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
 
+        now = datetime.utcnow()
         new_user = User(
             email=user_in.email,
             hashed_password=get_password_hash(user_in.password),
             full_name=user_in.full_name,
             role=user_in.role,
-            created_by_id=str(current_user.id)
+            created_by_id=str(current_user.id),
+            trial_start_date=now,
+            trial_end_date=now + timedelta(days=7),
+            has_full_access=False
         )
         await new_user.insert()
         
-        # Manually construct return to avoid Pydantic ObjectId issues
         return {
             "id": str(new_user.id),
             "email": new_user.email,
             "full_name": new_user.full_name,
             "role": new_user.role,
+            "has_full_access": new_user.has_full_access,
+            "trial_start_date": new_user.trial_start_date,
+            "trial_end_date": new_user.trial_end_date,
             "created_at": new_user.created_at
         }
     except Exception as e:
@@ -143,19 +301,38 @@ async def list_managed_users(
         else:
             users = await User.find(User.created_by_id == str(current_user.id), User.role == UserRole.USER).to_list()
         
-        # Manually format each user to ensure 'id' is a string
         return [
             {
                 "id": str(u.id),
                 "email": u.email,
                 "full_name": u.full_name,
                 "role": u.role,
+                "has_full_access": u.has_full_access,
+                "trial_start_date": u.trial_start_date,
+                "trial_end_date": u.trial_end_date,
                 "created_at": u.created_at
             } for u in users
         ]
     except Exception as e:
         print(f"ERROR LISTING USERS: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/admin/users/{user_id}/access")
+async def toggle_full_access(
+    user_id: str,
+    access_data: dict,
+    current_user: User = Depends(check_role([UserRole.ADMIN, UserRole.SUPER_ADMIN]))
+):
+    target_user = await User.get(user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if current_user.role == UserRole.ADMIN and target_user.created_by_id != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to manage this user")
+        
+    target_user.has_full_access = access_data.get("has_full_access", False)
+    await target_user.save()
+    return {"message": "Access updated successfully", "has_full_access": target_user.has_full_access}
 
 @app.delete("/admin/users/{user_id}")
 async def delete_managed_user(
@@ -286,26 +463,50 @@ async def create_client(
     client_in: ClientCreate, 
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
+    await check_subscription(user)
+    await check_employee_restriction(user, "client")
     try:
         new_client = Client(**client_in.dict(), user_id=str(user.id))
         await new_client.insert()
+        
+        # Explicit construction for Pydantic V2 compatibility
         return {
             "id": str(new_client.id),
-            **new_client.dict(exclude={"id", "user_id"})
+            "company_name": new_client.company_name,
+            "contact_person": new_client.contact_person,
+            "mobile": new_client.mobile,
+            "whatsapp": new_client.whatsapp,
+            "email": new_client.email,
+            "address": new_client.address,
+            "shipping_address": new_client.shipping_address,
+            "gst_number": new_client.gst_number,
+            "state": new_client.state,
+            "created_at": new_client.created_at
         }
     except Exception as e:
         print(f"ERROR CREATING CLIENT: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/clients", response_model=List[ClientOut])
 async def get_clients(user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))):
     if user.role == UserRole.SUPER_ADMIN:
         clients = await Client.find_all().to_list()
     else:
         clients = await Client.find(Client.user_id == str(user.id)).to_list()
+    
     return [
         {
             "id": str(c.id),
-            **c.dict(exclude={"id", "user_id"})
+            "company_name": c.company_name,
+            "contact_person": c.contact_person,
+            "mobile": c.mobile,
+            "whatsapp": c.whatsapp,
+            "email": c.email,
+            "address": c.address,
+            "shipping_address": c.shipping_address,
+            "gst_number": c.gst_number,
+            "state": c.state,
+            "created_at": c.created_at
         } for c in clients
     ]
 
@@ -315,6 +516,7 @@ async def update_client(
     client_in: ClientCreate,
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
+    await check_employee_restriction(user, "client", is_create=False)
     client = await Client.get(client_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -331,6 +533,7 @@ async def delete_client(
     client_id: str,
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
+    await check_employee_restriction(user, "client", is_create=False)
     client = await Client.get(client_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -345,6 +548,8 @@ async def create_product(
     product_in: ProductCreate, 
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
+    await check_subscription(user)
+    await check_employee_restriction(user, "product")
     try:
         new_product = Product(**product_in.dict(), user_id=str(user.id))
         await new_product.insert()
@@ -374,6 +579,7 @@ async def update_product(
     product_in: ProductCreate,
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
+    await check_employee_restriction(user, "product", is_create=False)
     product = await Product.get(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -415,11 +621,14 @@ async def _adjust_stock(items, direction="reduce"):
                 print(f"ERROR adjusting stock for product {item.product_id}: {str(e)}")
 
 # --- INVOICES ---
+
 @app.post("/invoices")
 async def create_invoice(
     invoice_in: InvoiceCreate, 
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
+    await check_subscription(user)
+    await check_employee_restriction(user, "invoice")
     try:
         existing = await Invoice.find_one(Invoice.user_id == str(user.id), Invoice.invoice_number == invoice_in.invoice_number)
         if existing:
@@ -506,6 +715,7 @@ async def update_invoice_status(
     status_in: dict,
     user: User = Depends(get_current_user)
 ):
+    await check_employee_restriction(user, "invoice", is_create=False)
     invoice = await Invoice.get(invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -526,6 +736,11 @@ async def update_invoice_status(
         
     new_status = status_in.get("status", "").upper()
     invoice.status = new_status
+    
+    # Sync paid_amount if marked as PAID to ensure metrics updates correctly
+    if new_status == "PAID" and (invoice.paid_amount or 0) < invoice.total_amount:
+        invoice.paid_amount = invoice.total_amount
+    
     await invoice.save()
     return {"detail": "Status updated"}
 
@@ -730,6 +945,7 @@ async def delete_invoice(
     invoice_id: str,
     user: User = Depends(get_current_user)
 ):
+    await check_employee_restriction(user, "invoice", is_create=False)
     invoice = await Invoice.get(invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -746,6 +962,7 @@ async def update_invoice(
     invoice_in: InvoiceCreate,
     user: User = Depends(get_current_user)
 ):
+    await check_employee_restriction(user, "invoice", is_create=False)
     invoice = await Invoice.get(invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -829,8 +1046,10 @@ def _calc_items(items_in):
 @app.post("/quotations")
 async def create_quotation(
     q_in: QuotationCreate,
-    user: User = Depends(get_current_user)
+    user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
+    await check_subscription(user)
+    await check_employee_restriction(user, "quotation")
     try:
         sub_total, total_gst, items = _calc_items(q_in.items)
         disc = 0
@@ -918,6 +1137,7 @@ async def get_quotations(user: User = Depends(get_current_user)):
 
 @app.delete("/quotations/{quotation_id}")
 async def delete_quotation(quotation_id: str, user: User = Depends(get_current_user)):
+    await check_employee_restriction(user, "quotation", is_create=False)
     q = await Quotation.get(quotation_id)
     if not q:
         raise HTTPException(status_code=404, detail="Quotation not found")
@@ -934,6 +1154,7 @@ async def convert_quotation_to_invoice(
     user: User = Depends(get_current_user)
 ):
     """Convert a quotation to a full invoice."""
+    await check_employee_restriction(user, "invoice")
     q = await Quotation.get(quotation_id)
     if not q:
         raise HTTPException(status_code=404, detail="Quotation not found")
@@ -1035,8 +1256,10 @@ async def preview_quotation(
 @app.post("/proformas")
 async def create_proforma(
     p_in: ProformaCreate,
-    user: User = Depends(get_current_user)
+    user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
+    await check_subscription(user)
+    await check_employee_restriction(user, "proforma")
     try:
         sub_total, total_gst, items = _calc_items(p_in.items)
         disc = 0
@@ -1119,6 +1342,7 @@ async def get_proformas(user: User = Depends(get_current_user)):
 
 @app.delete("/proformas/{proforma_id}")
 async def delete_proforma(proforma_id: str, user: User = Depends(get_current_user)):
+    await check_employee_restriction(user, "proforma", is_create=False)
     p = await ProformaInvoice.get(proforma_id)
     if not p:
         raise HTTPException(status_code=404, detail="Proforma not found")
@@ -1134,6 +1358,7 @@ async def convert_proforma_to_invoice(
     body: dict,
     user: User = Depends(get_current_user)
 ):
+    await check_employee_restriction(user, "invoice")
     p = await ProformaInvoice.get(proforma_id)
     if not p:
         raise HTTPException(status_code=404, detail="Proforma not found")
@@ -1326,6 +1551,8 @@ async def create_payment(
     pay_in: PaymentRecordCreate,
     user: User = Depends(get_current_user)
 ):
+    await check_subscription(user)
+    await check_employee_restriction(user, "payment")
     payment = PaymentRecord(
         user_id=str(user.id),
         client_id=pay_in.client_id,
@@ -1397,9 +1624,20 @@ async def get_reports_summary(user: User = Depends(get_current_user)):
     
     invoices = [i for i in invoices if not getattr(i, 'is_deleted', False)]
     
-    total_revenue = sum(i.paid_amount or 0 for i in invoices)
-    total_outstanding = sum((i.total_amount or 0) - (i.paid_amount or 0) for i in invoices if i.status != InvoiceStatus.PAID)
-    total_invoiced = sum(i.total_amount or 0 for i in invoices)
+    # Fetch all payments to include general payments (unlinked to invoices)
+    if user.role == UserRole.SUPER_ADMIN:
+        payments = await PaymentRecord.find_all().to_list()
+    else:
+        payments = await PaymentRecord.find(PaymentRecord.user_id == uid).to_list()
+
+    # Total collected = payments on invoices + general payments (unlinked)
+    # Since invoice.paid_amount is updated when a linked payment is created,
+    # we can sum all invoice.paid_amount and add only unlinked payments.
+    unlinked_payments_sum = sum(p.amount for p in payments if not p.invoice_id)
+    
+    total_revenue = sum(i.paid_amount or 0 for i in invoices) + unlinked_payments_sum
+    total_invoiced = sum(i.total_amount or 0 for i in invoices if i.status != InvoiceStatus.DRAFT)
+    total_outstanding = total_invoiced - total_revenue
     
     # Per-client breakdown
     client_map = {str(c.id): c.company_name for c in clients}
@@ -1411,6 +1649,13 @@ async def get_reports_summary(user: User = Depends(get_current_user)):
         client_stats[cid]["invoiced"] += inv.total_amount or 0
         client_stats[cid]["paid"] += inv.paid_amount or 0
         client_stats[cid]["count"] += 1
+    
+    # Add unlinked payments to client stats
+    for p in payments:
+        if not p.invoice_id:
+            cid = p.client_id
+            if cid in client_stats:
+                client_stats[cid]["paid"] += p.amount
     
     # Low stock products
     low_stock = [{"id": str(p.id), "name": p.name, "stock": p.stock, "unit": p.unit} for p in products if p.stock <= 10]
@@ -1483,9 +1728,11 @@ async def get_stats(
     if user.role == UserRole.SUPER_ADMIN:
         try:
             all_invoices = await Invoice.find_all().to_list()
+            all_payments = await PaymentRecord.find_all().to_list()
             admins = await User.find(User.role == UserRole.ADMIN).to_list()
+            unlinked_pmts = sum(p.amount for p in all_payments if not p.invoice_id)
             return {
-                "total_sales": sum((inv.paid_amount or 0) for inv in all_invoices),
+                "total_sales": sum((inv.paid_amount or 0) for inv in all_invoices) + unlinked_pmts,
                 "total_admins": len(admins),
                 "total_users": len(await User.find(User.role == UserRole.USER).to_list()),
                 "total_invoices": len(all_invoices),
@@ -1502,12 +1749,14 @@ async def get_stats(
         
         from beanie.operators import In
         invoices = await Invoice.find(In(Invoice.user_id, all_involved_ids)).to_list()
+        payments = await PaymentRecord.find(In(PaymentRecord.user_id, all_involved_ids)).to_list()
         managed_users = await User.find(User.created_by_id == str(user.id)).to_list()
+        unlinked_pmts = sum(p.amount for p in payments if not p.invoice_id)
         
         return {
             "active_users": len(descendant_ids),
             "total_invoices": len(invoices),
-            "total_sales": sum((inv.paid_amount or 0) for inv in invoices),
+            "total_sales": sum((inv.paid_amount or 0) for inv in invoices) + unlinked_pmts,
             "managed_users": [{"id": str(u.id), "full_name": u.full_name, "email": u.email} for u in managed_users]
         }
 
@@ -1529,8 +1778,11 @@ async def get_stats(
             "status": inv.status
         })
 
+    user_payments = await PaymentRecord.find(PaymentRecord.user_id == str(user.id)).to_list()
+    unlinked_pmts = sum(p.amount for p in user_payments if not p.invoice_id)
+    
     return {
-        "total_sales": sum((inv.paid_amount or 0) for inv in user_invoices),
+        "total_sales": sum((inv.paid_amount or 0) for inv in user_invoices) + unlinked_pmts,
         "total_clients": clients_count,
         "total_products": len(await Product.find(Product.user_id == str(user.id)).to_list()),
         "total_invoices": len(user_invoices),

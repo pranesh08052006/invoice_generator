@@ -128,29 +128,31 @@ const Quotations = ({ user }) => {
             Manage client estimates and convert them to invoices
           </p>
         </div>
-        <button 
-          onClick={() => navigate('/quotations/new')}
-          style={{
-            height: '42px',
-            padding: '0 20px',
-            backgroundColor: 'var(--primary-color)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'all 0.15s ease',
-            boxShadow: '0 2px 4px var(--primary-light)'
-          }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-hover)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--primary-color)'}
-        >
-          <Plus size={16} /> New Quotation
-        </button>
+        {user?.role !== 'admin' && (
+          <button 
+            onClick={() => navigate('/quotations/new')}
+            style={{
+              height: '42px',
+              padding: '0 20px',
+              backgroundColor: 'var(--primary-color)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.15s ease',
+              boxShadow: '0 2px 4px var(--primary-light)'
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-hover)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--primary-color)'}
+          >
+            <Plus size={16} /> New Quotation
+          </button>
+        )}
       </div>
 
       {/* Grid row of 3 Premium Metrics cards */}
@@ -336,7 +338,7 @@ const Quotations = ({ user }) => {
                         <button onClick={() => handleDownload(q.id, q.quotation_number)} style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', color: '#64748b', cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary-color)'; e.currentTarget.style.color = 'var(--primary-color)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#64748b'; }}>
                           <Download size={15} />
                         </button>
-                        {q.status !== 'CONVERTED' && (
+                        {q.status !== 'CONVERTED' && user?.role !== 'admin' && (
                           <button 
                             onClick={() => handleConvertToInvoice(q.id)} 
                             disabled={converting}
@@ -350,9 +352,11 @@ const Quotations = ({ user }) => {
                             <CheckCircle size={14} /> Convert
                           </button>
                         )}
-                        <button onClick={() => handleDelete(q.id)} style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', color: '#64748b', cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#64748b'; }}>
-                          <Trash2 size={15} />
-                        </button>
+                        {user?.role !== 'admin' && (
+                          <button onClick={() => handleDelete(q.id)} style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', color: '#64748b', cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#64748b'; }}>
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

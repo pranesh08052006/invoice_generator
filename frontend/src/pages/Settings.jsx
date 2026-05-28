@@ -8,7 +8,7 @@ import {
   Palette, RotateCcw
 } from 'lucide-react';
 
-const SettingsPage = ({ fetchCompanyGlobal }) => {
+const SettingsPage = ({ user, fetchCompanyGlobal }) => {
   const navigate = useNavigate();
   const [company, setCompany] = useState({
     name: '',
@@ -31,6 +31,7 @@ const SettingsPage = ({ fetchCompanyGlobal }) => {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [subscription, setSubscription] = useState(null);
   
   // Cache buster timestamps to force reload new uploads
   const [logoCacheBuster, setLogoCacheBuster] = useState(Date.now());
@@ -38,7 +39,21 @@ const SettingsPage = ({ fetchCompanyGlobal }) => {
 
   useEffect(() => {
     fetchCompany();
+    fetchSubscription();
   }, []);
+
+  const fetchSubscription = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/subscription/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSubscription(response.data);
+    } catch (err) {
+      console.error("Error fetching subscription:", err);
+    }
+  };
+
 
   useEffect(() => {
     const primary = company.primary_color || '#2563eb';
@@ -582,6 +597,90 @@ const SettingsPage = ({ fetchCompanyGlobal }) => {
             </div>
           </div>
 
+          {/* Card 5: Subscription & Billing — only for standard users */}
+          {user?.role === 'user' && (<div style={{ 
+            backgroundColor: 'var(--secondary-color)', 
+            border: '1px solid #eaedf3', 
+            borderRadius: '12px', 
+            padding: '32px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.01)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#111827' }}>
+                <ShieldCheck size={18} style={{ color: '#16a34a' }} />
+                Subscription & Billing
+              </h3>
+              {subscription && (
+                <div style={{ 
+                  padding: '4px 12px', borderRadius: '99px', 
+                  backgroundColor: subscription.is_full_access || (!subscription.is_expired && subscription.status === 'active') ? '#dcfce7' : '#fee2e2', 
+                  color: subscription.is_full_access || (!subscription.is_expired && subscription.status === 'active') ? '#16a34a' : '#ef4444', 
+                  fontSize: '11px', fontWeight: '800', textTransform: 'uppercase' 
+                }}>
+                  {subscription.is_full_access ? 'ACTIVE' : subscription.is_expired ? 'EXPIRED' : subscription.status}
+                </div>
+              )}
+            </div>
+
+            {subscription ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ padding: '20px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #eaedf3', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Current Plan</div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#111827', marginTop: '4px' }}>{subscription.plan?.replace('_', ' ')}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Validity</div>
+                    <div style={{ 
+                      fontSize: '18px', fontWeight: '800', marginTop: '4px',
+                      color: subscription.is_full_access ? '#16a34a' : (subscription.is_expired || subscription.days_left === 0) ? '#ef4444' : subscription.days_left < 3 ? '#f59e0b' : '#111827'
+                    }}>
+                      {subscription.is_full_access
+                        ? 'Full Access'
+                        : subscription.is_expired || subscription.days_left === 0
+                          ? 'Trial Ended'
+                          : `${subscription.days_left} Days Left`}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Upgrade or Renew via WhatsApp</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    {[
+                      { name: 'Basic', price: '₹4,999/yr', features: ['Unlimited Invoices', 'Stock Management'] },
+                      { name: 'Premium', price: '₹9,999/yr', features: ['WhatsApp Automation', 'Multi-user Access'] }
+                    ].map(plan => (
+                      <div 
+                        key={plan.name}
+                        onClick={() => {
+                          const msg = encodeURIComponent(`Hi, I would like to upgrade my Justry account to the ${plan.name} plan. My email is ${localStorage.getItem('userEmail') || 'registered email'}.`);
+                          window.open(`https://wa.me/919876543210?text=${msg}`, '_blank');
+                        }}
+                        style={{ padding: '16px', border: '1px solid #e2e8f0', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.15s ease', backgroundColor: '#ffffff' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary-color)'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none'; }}
+                      >
+                        <div style={{ fontSize: '14px', fontWeight: '800', color: '#111827' }}>{plan.name}</div>
+                        <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', marginTop: '4px' }}>{plan.price}</div>
+                        <ul style={{ padding: 0, margin: '12px 0 0 0', listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {plan.features.map(f => <li key={f} style={{ fontSize: '11px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle2 size={10} style={{ color: '#16a34a' }} /> {f}</li>)}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+                Fetching subscription details...
+              </div>
+            )}
+          </div>
+          )}
 
         </div>
       </div>

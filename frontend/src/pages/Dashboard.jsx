@@ -283,6 +283,7 @@ const RevenueChart = ({ invoices = [] }) => {
 const Dashboard = ({ user }) => {
   const [stats, setStats] = useState(null);
   const [allInvoices, setAllInvoices] = useState([]);
+  const [allPayments, setAllPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userStats, setUserStats] = useState(null);
@@ -296,6 +297,9 @@ const Dashboard = ({ user }) => {
       
       const invResponse = await axios.get(`${API_BASE_URL}/invoices`);
       setAllInvoices(invResponse.data);
+      
+      const payResponse = await axios.get(`${API_BASE_URL}/payments`);
+      setAllPayments(payResponse.data || []);
     } catch (err) {
       console.error('Failed to fetch stats', err);
     } finally {
@@ -326,7 +330,21 @@ const Dashboard = ({ user }) => {
 
   const totalPaidInvoices = allInvoices.filter(inv => inv.status?.toUpperCase() === 'PAID').length;
   const totalUnpaidInvoices = allInvoices.filter(inv => inv.status?.toUpperCase() !== 'PAID' && inv.status?.toUpperCase() !== 'DRAFT').length;
-  const pendingAmount = allInvoices.filter(inv => inv.status?.toUpperCase() !== 'DRAFT').reduce((sum, inv) => sum + ((inv.total_amount || 0) - (inv.paid_amount || 0)), 0);
+  const unlinkedPmtsSum = allPayments.filter(p => !p.invoice_id).reduce((sum, p) => sum + (p.amount || 0), 0);
+  const pendingAmount = allInvoices.filter(inv => inv.status?.toUpperCase() !== 'DRAFT')
+    .reduce((sum, inv) => sum + ((inv.total_amount || 0) - (inv.paid_amount || 0)), 0) - unlinkedPmtsSum;
+
+  const calculateDaysLeft = () => {
+    if (user?.has_full_access) return null;
+    if (!user?.trial_end_date) return null;
+    const end = new Date(user.trial_end_date);
+    const now = new Date();
+    const diff = end - now;
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : 0;
+  };
+
+  const daysLeft = calculateDaysLeft();
 
   return (
     <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -341,14 +359,51 @@ const Dashboard = ({ user }) => {
         boxShadow: '0 10px 25px -5px var(--primary-light)',
         backgroundImage: 'radial-gradient(circle at top right, rgba(255, 255, 255, 0.15), transparent), linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%)'
       }}>
-        <div>
-          <h2 style={{ fontSize: '26px', fontWeight: '800', margin: '0 0 6px 0', letterSpacing: '-0.02em' }}>
-            Welcome back, {user?.full_name?.split(' ')?.[0] || 'User'}
-          </h2>
-          <p style={{ margin: 0, color: '#eff6ff', fontSize: '14px', opacity: 0.9 }}>
-            Here is what's happening with your business today.
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+              <h2 style={{ fontSize: '26px', fontWeight: '800', margin: 0, letterSpacing: '-0.02em' }}>
+                Welcome back, {user?.full_name?.split(' ')?.[0] || 'User'}
+              </h2>
+              {user?.has_full_access && (
+                <span style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(4px)',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                  fontSize: '10px',
+                  fontWeight: '800',
+                  letterSpacing: '0.05em'
+                }}>PRO</span>
+              )}
+            </div>
+            <p style={{ margin: 0, color: '#eff6ff', fontSize: '14px', opacity: 0.9 }}>
+              Here is what's happening with your business today.
+            </p>
+          </div>
+
+          {user?.role === 'user' && (user?.has_full_access || daysLeft !== null) && (
+            <div style={{
+              backgroundColor: user?.has_full_access ? 'rgba(255, 255, 255, 0.15)' : (daysLeft >= 0 ? 'rgba(255, 255, 255, 0.15)' : 'rgba(239, 68, 68, 0.2)'),
+              padding: '10px 20px',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              border: `1px solid ${user?.has_full_access || daysLeft >= 0 ? 'rgba(255, 255, 255, 0.2)' : 'rgba(239, 68, 68, 0.3)'}`,
+              marginLeft: '20px'
+            }}>
+              {user?.has_full_access ? <ShieldCheck size={20} /> : <Calendar size={20} />}
+              <div>
+                <div style={{ fontSize: '10px', fontWeight: '700', opacity: 0.8, textTransform: 'uppercase' }}>Account Status</div>
+                <div style={{ fontSize: '15px', fontWeight: '800' }}>
+                  {user?.has_full_access ? 'Full Access' : (daysLeft >= 0 ? `${daysLeft} days remaining` : 'Trial ended')}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+
         {user?.role === 'user' && (
           <button 
             onClick={() => navigate('/invoices/new')}
@@ -596,41 +651,6 @@ const Dashboard = ({ user }) => {
                   <span style={{ fontSize: '13px', fontWeight: '500', color: '#6b7280' }}>Last Sync</span>
                   <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '500' }}>Just now</span>
                 </div>
-              </div>
-            </div>
-
-            {/* Enterprise Support Banner */}
-            <div style={{
-              borderRadius: '12px',
-              padding: '32px',
-              color: 'white',
-              boxShadow: '0 10px 25px -5px var(--primary-light)',
-              backgroundImage: 'radial-gradient(circle at top right, rgba(255, 255, 255, 0.15), transparent), linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%)',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                <h3 style={{ fontSize: '18px', fontWeight: '700', margin: '0 0 12px 0', letterSpacing: '-0.02em' }}>Enterprise Support</h3>
-                <p style={{ fontSize: '14px', opacity: 0.85, margin: '0 0 24px 0', lineHeight: '1.6', color: '#eff6ff' }}>
-                  Access our professional documentation or contact our dedicated support team for advanced configurations.
-                </p>
-                <button style={{
-                  width: '100%',
-                  backgroundColor: '#ffffff',
-                  color: 'var(--primary-color)',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '12px',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-                onMouseEnter={e => e.target.style.backgroundColor = '#f4f4f5'}
-                onMouseLeave={e => e.target.style.backgroundColor = '#ffffff'}
-                >
-                  Access Documentation
-                </button>
               </div>
             </div>
           </div>

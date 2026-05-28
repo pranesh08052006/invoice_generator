@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE_URL from '../config';
 
-import { Search, Plus, Phone, MessageSquare, Hash, X, MapPin, Edit3, Trash2, User, ChevronDown, Layout, Eye, Download, Share2, FileText } from 'lucide-react';
+import { Search, Plus, Phone, MessageSquare, Hash, X, MapPin, Edit3, Trash2, User, ChevronDown, Layout, Eye, Download, Share2, FileText, CreditCard } from 'lucide-react';
 
 const Clients = ({ user, company }) => {
   const navigate = useNavigate();
@@ -11,13 +11,20 @@ const Clients = ({ user, company }) => {
   const [invoices, setInvoices] = useState([]);
   const [quotations, setQuotations] = useState([]);
   const [proformas, setProformas] = useState([]);
-  const [transactionTab, setTransactionTab] = useState('INVOICES'); // INVOICES, QUOTATIONS, PROFORMA
+  const [transactionTab, setTransactionTab] = useState('INVOICES'); // INVOICES, QUOTATIONS, PROFORMA, PAYMENTS
+  const [payments, setPayments] = useState([]);
+
+  // Payment recording modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({ amount: '', payment_method: 'CASH', notes: '' });
+  const [savingPayment, setSavingPayment] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [viewingClient, setViewingClient] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('newest');
+  const [savingClient, setSavingClient] = useState(false);
   
   const [showPreview, setShowPreview] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -91,20 +98,99 @@ const Clients = ({ user, company }) => {
 
   const fetchClients = async () => {
     try {
-      const [cRes, iRes, qRes, pRes] = await Promise.all([
+      const [cRes, iRes, qRes, pRes, payRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/clients`),
         axios.get(`${API_BASE_URL}/invoices`),
         axios.get(`${API_BASE_URL}/quotations`),
-        axios.get(`${API_BASE_URL}/proformas`)
+        axios.get(`${API_BASE_URL}/proformas`),
+        axios.get(`${API_BASE_URL}/payments`)
       ]);
       setClients(cRes.data);
       setInvoices(iRes.data);
       setQuotations(qRes.data);
       setProformas(pRes.data);
+      setPayments(payRes.data || []);
     } catch (err) { 
       console.error(err); 
     }
   };
+
+  const handleRecordPayment = async (e) => {
+    e.preventDefault();
+    if (!viewingClient || !paymentForm.amount || parseFloat(paymentForm.amount) <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+    setSavingPayment(true);
+    try {
+      await axios.post(`${API_BASE_URL}/payments`, {
+        client_id: viewingClient.id,
+        amount: parseFloat(paymentForm.amount),
+        payment_method: paymentForm.payment_method,
+        notes: paymentForm.notes || null
+      });
+      setShowPaymentModal(false);
+      setPaymentForm({ amount: '', payment_method: 'CASH', notes: '' });
+      await fetchClients();
+    } catch (err) {
+      alert('Failed to record payment. Please try again.');
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const generateReminderPDF = (client, balance) => {
+    const printWindow = window.open('', '_blank');
+    const companyName = company?.name || 'Our Company';
+    const companyMobile = company?.mobile || '';
+    const companyEmail = company?.email || '';
+    const balanceStr = balance.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    const html = `<html><head><title>Payment Reminder - ${client.company_name}</title>
+      <style>
+        body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#111827;padding:48px;margin:0;}
+        .hdr{display:flex;justify-content:space-between;align-items:start;border-bottom:3px solid #2563eb;padding-bottom:24px;margin-bottom:32px;}
+        .co{font-size:22px;font-weight:800;color:#1e3a8a;}
+        .badge{background:#fef2f2;color:#b91c1c;padding:4px 14px;border-radius:99px;font-size:11px;font-weight:800;text-transform:uppercase;display:inline-block;margin-bottom:8px;}
+        .box{background:#fef2f2;border:2px solid #fca5a5;border-radius:12px;padding:24px 32px;text-align:center;margin:32px 0;}
+        .lbl{font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;}
+        .val{font-size:40px;font-weight:800;color:#b91c1c;margin-top:4px;}
+        .msg{font-size:15px;line-height:1.7;color:#374151;margin:24px 0;}
+        .ftr{margin-top:48px;padding-top:24px;border-top:1px solid #eaedf3;font-size:12px;color:#9ca3af;}
+      </style></head>
+      <body>
+        <div class="hdr">
+          <div>
+            <div class="badge">Payment Reminder</div>
+            <div class="co">${companyName}</div>
+            ${companyMobile ? `<div style="font-size:13px;color:#6b7280;margin-top:4px;">${companyMobile}</div>` : ''}
+            ${companyEmail ? `<div style="font-size:13px;color:#6b7280;">${companyEmail}</div>` : ''}
+          </div>
+          <div style="text-align:right;font-size:13px;color:#6b7280;">
+            <strong>${client.company_name}</strong><br/>
+            ${client.mobile}<br/>
+            ${client.email || ''}<br/>
+            ${client.address || ''}
+          </div>
+        </div>
+        <div class="box">
+          <div class="lbl">Outstanding Balance Due</div>
+          <div class="val">&#8377;${balanceStr}</div>
+        </div>
+        <div class="msg">
+          Dear <strong>${client.company_name}</strong>,<br/><br/>
+          This is a friendly reminder that you have an outstanding balance of <strong>&#8377;${balanceStr}</strong> with <strong>${companyName}</strong>.<br/><br/>
+          We kindly request you to settle this amount at your earliest convenience. If payment has already been made, please disregard this notice.<br/><br/>
+          For any queries, please contact us at ${companyMobile || companyEmail || 'our office'}.
+        </div>
+        <div class="ftr">
+          Generated on ${new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })} &nbsp;|&nbsp; ${companyName}
+        </div>
+        <script>window.onload=function(){window.print();setTimeout(function(){window.close();},500);};</script>
+      </body></html>`;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
 
   const exportClientStatementCSV = (client, docs, type = 'INVOICES') => {
     const numKey = type === 'QUOTATIONS' ? 'quotation_number' : type === 'PROFORMA' ? 'proforma_number' : 'invoice_number';
@@ -239,9 +325,15 @@ const Clients = ({ user, company }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (savingClient) return;
+    
+    setSavingClient(true);
     try {
-      const payload = { ...newClient };
-      if (whatsappSameAsPhone) payload.whatsapp = payload.mobile;
+      const payload = { 
+        ...newClient,
+        whatsapp: whatsappSameAsPhone ? newClient.mobile : newClient.whatsapp,
+        shipping_address: shippingSameAsBilling ? newClient.address : newClient.shipping_address
+      };
       
       if (editingId) {
         await axios.put(`${API_BASE_URL}/clients/${editingId}`, payload);
@@ -252,7 +344,22 @@ const Clients = ({ user, company }) => {
       closeModal();
       fetchClients();
     } catch (err) {
-      alert('Error saving client. Check if all fields are valid.');
+      console.error("Save client error:", err.response?.data || err);
+      const errorMsg = err.response?.data?.detail || err.message || 'Error saving client. Please check all fields.';
+      
+      if (err.response?.status === 422) {
+        const details = err.response.data.detail;
+        if (Array.isArray(details)) {
+          const firstErr = details[0];
+          alert(`Validation Error: ${firstErr.loc.join('.')} - ${firstErr.msg}`);
+        } else {
+          alert('Invalid data. Please check all fields.');
+        }
+      } else {
+        alert(errorMsg);
+      }
+    } finally {
+      setSavingClient(false);
     }
   };
 
@@ -295,7 +402,13 @@ const Clients = ({ user, company }) => {
 
   const getClientBalance = (client) => {
     const clientInvoices = invoices.filter(inv => inv.client_id === client.id);
-    return clientInvoices.reduce((sum, inv) => sum + ((inv.total_amount || 0) - (inv.paid_amount || 0)), 0);
+    const totalBilled = clientInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+    const totalPaidOnInvoices = clientInvoices.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+    const totalSpecificPayments = (payments || [])
+      .filter(p => p.client_id === client.id)
+      .reduce((sum, p) => sum + (p.amount || 0), 0);
+    
+    return totalBilled - totalPaidOnInvoices - totalSpecificPayments;
   };
 
   const filtered = clients
@@ -332,30 +445,60 @@ const Clients = ({ user, company }) => {
             Manage your client registry, contact details, and tax information.
           </p>
         </div>
-        <button 
-          type="button"
-          onClick={() => setShowModal(true)} 
-          style={{ 
-            backgroundColor: 'var(--primary-color)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '10px 20px', 
-            fontSize: '13px',
-            fontWeight: '700',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'all 0.15s ease',
-            boxShadow: '0 2px 4px var(--primary-light)'
-          }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-hover)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--primary-color)'}
-        >
-          <Plus size={16} /> Add New Customer
-        </button>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const clientsWithBalance = clients.filter(c => getClientBalance(c) > 0);
+              if (clientsWithBalance.length === 0) {
+                alert("No clients with outstanding balance found.");
+                return;
+              }
+              if (window.confirm(`Found ${clientsWithBalance.length} clients with outstanding balance. Would you like to start sending reminders?`)) {
+                const first = clientsWithBalance[0];
+                sendReminder(first, getClientBalance(first));
+              }
+            }}
+            style={{ 
+              backgroundColor: '#ffffff', color: '#16a34a', border: '1px solid #e2e8f0',
+              borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: '700',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f0fdf4'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#ffffff'}
+          >
+            <MessageSquare size={16} /> Bulk Reminders
+          </button>
+          {user?.role !== 'admin' && (
+            <button 
+              type="button"
+              onClick={() => setShowModal(true)} 
+              style={{ 
+                backgroundColor: 'var(--primary-color)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '10px 20px', 
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.15s ease',
+                boxShadow: '0 2px 4px var(--primary-light)'
+              }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-hover)'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--primary-color)'}
+            >
+              <Plus size={16} /> Add New Customer
+            </button>
+          )}
+        </div>
       </div>
+
 
       {/* Redesigned Premium Search & Filter Bar */}
       <div style={{ 
@@ -466,13 +609,14 @@ const Clients = ({ user, company }) => {
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #eaedf3' }}>
-              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '24%', paddingLeft: '32px' }}>Client Entity</th>
-              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '15%' }}>Contact Info</th>
-              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '13%' }}>Total Billed</th>
-              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '15%' }}>Outstanding Balance</th>
-              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '13%' }}>Taxation</th>
-              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '10%' }}>Location</th>
-              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '10%', textAlign: 'right', paddingRight: '32px' }}>Actions</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '20%', paddingLeft: '32px' }}>Client Entity</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '13%' }}>Contact Info</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '11%' }}>Total Billed</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '11%' }}>Paid Amount</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '11%' }}>Outstanding</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '11%' }}>Taxation</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '11%' }}>Location</th>
+              <th style={{ padding: '16px 24px', fontSize: '11px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', width: '12%', textAlign: 'right', paddingRight: '32px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -480,7 +624,12 @@ const Clients = ({ user, company }) => {
               const isCorporate = !!c.gst_number;
               const clientInvoices = invoices.filter(inv => inv.client_id === c.id);
               const totalInvoiced = clientInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-              const totalPaid = clientInvoices.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+              const totalPaidInvoices = clientInvoices.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+              const totalSpecificPayments = (payments || [])
+                .filter(p => p.client_id === c.id)
+                .reduce((sum, p) => sum + (p.amount || 0), 0);
+              
+              const totalPaid = totalPaidInvoices + totalSpecificPayments;
               const outstandingBalance = totalInvoiced - totalPaid;
               return (
                 <tr 
@@ -558,6 +707,22 @@ const Clients = ({ user, company }) => {
                     </div>
                   </td>
 
+                  {/* Paid Amount Column */}
+                  <td style={{ padding: '16px 24px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ 
+                        fontWeight: '700', 
+                        color: '#16a34a', 
+                        fontSize: '14px' 
+                      }}>
+                        ₹{totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600' }}>
+                        Total Paid
+                      </span>
+                    </div>
+                  </td>
+
                   {/* Outstanding Balance Column */}
                   <td style={{ padding: '16px 24px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -569,7 +734,7 @@ const Clients = ({ user, company }) => {
                         ₹{outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </span>
                       <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600' }}>
-                        {outstandingBalance > 0 ? 'Payment Pending' : 'Clear Balance'}
+                        {outstandingBalance > 0 ? 'Outstanding' : 'Cleared'}
                       </span>
                     </div>
                   </td>
@@ -653,59 +818,63 @@ const Clients = ({ user, company }) => {
                           <MessageSquare size={15} />
                         </button>
                       )}
-                      <button 
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleEdit(c); }}
-                        style={{
-                          border: 'none',
-                          backgroundColor: 'transparent',
-                          color: '#4b5563',
-                          cursor: 'pointer',
-                          padding: '6px',
-                          borderRadius: '6px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.15s ease'
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.backgroundColor = 'var(--primary-light)';
-                          e.currentTarget.style.color = 'var(--primary-color)';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = '#4b5563';
-                        }}
-                      >
-                        <Edit3 size={15} />
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
-                        style={{
-                          border: 'none',
-                          backgroundColor: 'transparent',
-                          color: '#ef4444',
-                          cursor: 'pointer',
-                          padding: '6px',
-                          borderRadius: '6px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.15s ease',
-                          opacity: 0.8
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.backgroundColor = '#fee2e2';
-                          e.currentTarget.style.opacity = '1';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.opacity = '0.8';
-                        }}
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      {user?.role !== 'admin' && (
+                        <button 
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleEdit(c); }}
+                          style={{
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            color: '#4b5563',
+                            cursor: 'pointer',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.backgroundColor = 'var(--primary-light)';
+                            e.currentTarget.style.color = 'var(--primary-color)';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '#4b5563';
+                          }}
+                        >
+                          <Edit3 size={15} />
+                        </button>
+                      )}
+                      {user?.role !== 'admin' && (
+                        <button 
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
+                          style={{
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease',
+                            opacity: 0.8
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.backgroundColor = '#fee2e2';
+                            e.currentTarget.style.opacity = '1';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.opacity = '0.8';
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -1035,17 +1204,22 @@ const Clients = ({ user, company }) => {
               >
                 Cancel
               </button>
-              <button 
-                type="submit" 
-                form="customer-form" 
-                style={{
-                  padding: '8px 28px', backgroundColor: 'var(--primary-color)', color: '#ffffff',
-                  border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: 'pointer'
-                }}
-              >
-                {editingId ? 'Update Record' : 'Save Customer'}
-              </button>
+                <button 
+                  type="submit" 
+                  form="customer-form" 
+                  disabled={savingClient}
+                  style={{
+                    padding: '8px 28px', 
+                    backgroundColor: savingClient ? '#9ca3af' : 'var(--primary-color)', 
+                    color: '#ffffff',
+                    border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', 
+                    cursor: savingClient ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {savingClient ? 'Processing...' : (editingId ? 'Update Record' : 'Save Customer')}
+                </button>
             </div>
+
 
           </div>
         </div>
@@ -1073,20 +1247,56 @@ const Clients = ({ user, company }) => {
                   {viewingClient.company_name}
                 </h2>
                 <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>
-                  Client Activity & Summary
+                  Client Activity &amp; Summary
                 </p>
               </div>
-              <button 
-                onClick={() => setViewingClient(null)}
-                style={{
-                  border: 'none', background: '#f1f5f9', color: '#6b7280', width: '32px', height: '32px', 
-                  borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                  cursor: 'pointer'
-                }}
-              >
-                <X size={16} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* Reminder PDF button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const clientInvoices = invoices.filter(inv => inv.client_id === viewingClient.id);
+                    const totalRevenue = clientInvoices.reduce((s, inv) => s + (inv.total_amount || 0), 0);
+                    const totalPaid = clientInvoices.reduce((s, inv) => s + (inv.paid_amount || 0), 0);
+                    generateReminderPDF(viewingClient, totalRevenue - totalPaid);
+                  }}
+                  title="Generate Reminder PDF"
+                  style={{
+                    padding: '6px 12px', border: '1px solid #e2e8f0', borderRadius: '8px',
+                    backgroundColor: '#ffffff', fontSize: '11px', fontWeight: '700',
+                    color: '#4b5563', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = '#ffffff'}
+                >
+                  <FileText size={12} /> Reminder PDF
+                </button>
+                {/* Record Payment button */}
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentModal(true)}
+                  title="Record a Payment"
+                  style={{
+                    padding: '6px 14px', border: 'none', borderRadius: '8px',
+                    backgroundColor: 'var(--primary-color)', fontSize: '11px', fontWeight: '700',
+                    color: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
+                  }}
+                >
+                  <CreditCard size={12} /> Record Payment
+                </button>
+                <button 
+                  onClick={() => setViewingClient(null)}
+                  style={{
+                    border: 'none', background: '#f1f5f9', color: '#6b7280', width: '32px', height: '32px', 
+                    borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                    cursor: 'pointer'
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
+
 
             {/* Scrollable Content */}
             <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
@@ -1096,7 +1306,12 @@ const Clients = ({ user, company }) => {
                 {(() => {
                   const clientInvoices = invoices.filter(inv => inv.client_id === viewingClient.id);
                   const totalRevenue = clientInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-                  const totalPaid = clientInvoices.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+                  const totalPaidOnInvoices = clientInvoices.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+                  const totalSpecificPayments = (payments || [])
+                    .filter(p => p.client_id === viewingClient.id)
+                    .reduce((sum, p) => sum + (p.amount || 0), 0);
+                    
+                  const totalPaid = totalPaidOnInvoices + totalSpecificPayments;
                   const balance = totalRevenue - totalPaid;
                   
                   return (
@@ -1183,7 +1398,7 @@ const Clients = ({ user, company }) => {
 
               {/* Transaction Tab Navigation */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #eaedf3' }}>
-                {['INVOICES', 'QUOTATIONS', 'PROFORMA'].map((tab) => (
+                {['INVOICES', 'QUOTATIONS', 'PROFORMA', 'PAYMENTS'].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setTransactionTab(tab)}
@@ -1199,7 +1414,7 @@ const Clients = ({ user, company }) => {
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    {tab.charAt(0) + tab.slice(1).toLowerCase()}s
+                    {tab.charAt(0) + tab.slice(1).toLowerCase()}{tab === 'PAYMENTS' ? '' : 's'}
                   </button>
                 ))}
               </div>
@@ -1208,11 +1423,17 @@ const Clients = ({ user, company }) => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #eaedf3' }}>
-                      <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>Ref #</th>
-                      <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>Date</th>
-                      <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>Status</th>
+                      <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
+                        {transactionTab === 'PAYMENTS' ? 'Date' : 'Ref #'}
+                      </th>
+                      <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
+                        {transactionTab === 'PAYMENTS' ? 'Method' : 'Date'}
+                      </th>
+                      <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
+                        {transactionTab === 'PAYMENTS' ? 'Notes' : 'Status'}
+                      </th>
                       <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', textAlign: 'right' }}>Amount</th>
-                      <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>Actions</th>
+                      {transactionTab !== 'PAYMENTS' && <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1221,9 +1442,36 @@ const Clients = ({ user, company }) => {
                       if (transactionTab === 'INVOICES') activeDocs = invoices.filter(inv => inv.client_id === viewingClient.id);
                       else if (transactionTab === 'QUOTATIONS') activeDocs = quotations.filter(q => q.client_id === viewingClient.id);
                       else if (transactionTab === 'PROFORMA') activeDocs = proformas.filter(p => p.client_id === viewingClient.id);
+                      else if (transactionTab === 'PAYMENTS') activeDocs = (payments || []).filter(p => p.client_id === viewingClient.id);
 
                       if (activeDocs.length === 0) {
-                        return <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '13px' }}>No {transactionTab.toLowerCase()}s found for this customer.</td></tr>;
+                        return <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '13px' }}>No {transactionTab.toLowerCase()}{transactionTab === 'PAYMENTS' ? '' : 's'} found for this customer.</td></tr>;
+                      }
+
+                      if (transactionTab === 'PAYMENTS') {
+                        return activeDocs
+                          .sort((a, b) => new Date(b.payment_date || b.created_at) - new Date(a.payment_date || a.created_at))
+                          .map(pay => (
+                            <tr key={pay.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', color: '#6b7280' }}>
+                                {new Date(pay.payment_date || pay.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                              </td>
+                              <td style={{ padding: '12px 16px' }}>
+                                <span style={{ 
+                                  padding: '2px 8px', borderRadius: '99px', fontSize: '10px', fontWeight: '700',
+                                  backgroundColor: '#f1f5f9', color: '#475569'
+                                }}>
+                                  {pay.payment_method || 'CASH'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', color: '#6b7280', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {pay.notes || '-'}
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '700', textAlign: 'right', color: '#16a34a' }}>
+                                ₹{(pay.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          ));
                       }
 
                       return activeDocs
@@ -1266,6 +1514,71 @@ const Clients = ({ user, company }) => {
           </div>
         </div>
       )}
+
+      {/* Record Payment Modal */}
+      {showPaymentModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 99999
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff', width: '400px', borderRadius: '16px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', overflow: 'hidden'
+          }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #eaedf3', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#111827' }}>Record Payment</h3>
+              <button onClick={() => setShowPaymentModal(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#9ca3af' }}><X size={18} /></button>
+            </div>
+            <form onSubmit={handleRecordPayment} style={{ padding: '24px' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#4b5563', marginBottom: '6px', textTransform: 'uppercase' }}>Amount (₹)</label>
+                <input 
+                  type="number" step="0.01" required
+                  value={paymentForm.amount}
+                  onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px' }}
+                  placeholder="0.00"
+                />
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#4b5563', marginBottom: '6px', textTransform: 'uppercase' }}>Payment Method</label>
+                <select 
+                  value={paymentForm.payment_method}
+                  onChange={e => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px', backgroundColor: '#ffffff' }}
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                  <option value="ONLINE">Online</option>
+                  <option value="CHEQUE">Cheque</option>
+                </select>
+              </div>
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#4b5563', marginBottom: '6px', textTransform: 'uppercase' }}>Notes (Optional)</label>
+                <textarea 
+                  value={paymentForm.notes}
+                  onChange={e => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px', height: '80px', resize: 'none' }}
+                  placeholder="Reference number, etc."
+                />
+              </div>
+              <button 
+                type="submit" disabled={savingPayment}
+                style={{
+                  width: '100%', padding: '12px', backgroundColor: 'var(--primary-color)', color: '#ffffff',
+                  border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer',
+                  opacity: savingPayment ? 0.7 : 1
+                }}
+              >
+                {savingPayment ? 'Recording...' : 'Record Payment'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
 
       {/* Overhauled Centered Frosted Preview Modal Dialog */}
       {showPreview && (

@@ -13,10 +13,10 @@
   --text-dim: #a1a1aa;
   --text-on-accent: #ffffff;
 
-  /* Brand Accent (Sleek Monochrome Black) */
-  --accent: #09090b;
-  --accent-hover: #27272a;
-  --accent-soft: rgba(9, 9, 11, 0.08);
+  /* Brand Accent (Vibrant Blue) */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-soft: rgba(37, 99, 235, 0.08);
 
   /* Semantic Colors */
   --success: #10b981;
@@ -29,7 +29,7 @@
   /* Borders & Dividers */
   --border: #e4e4e7;
   --border-light: #f1f1f4;
-  --border-focus: #09090b;
+  --border-focus: #2563eb;
 
   /* Elevation & Shadows (Multi-layered for depth) */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);

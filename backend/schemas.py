@@ -14,6 +14,9 @@ class UserOut(BaseModel):
     email: str
     full_name: str
     role: UserRole
+    has_full_access: bool = False
+    trial_start_date: Optional[datetime] = None
+    trial_end_date: Optional[datetime] = None
     created_at: datetime
     class Config:
         from_attributes = True

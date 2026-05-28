@@ -9,13 +9,42 @@ class UserRole(str, Enum):
     ADMIN = "admin"
     USER = "user"
 
+class PlanType(str, Enum):
+    FREE_TRIAL = "FREE_TRIAL"
+    BASIC = "BASIC"
+    PREMIUM = "PREMIUM"
+    ENTERPRISE = "ENTERPRISE"
+
+class Subscription(Document):
+    user_id: Indexed(str, unique=True)
+    plan_type: PlanType = PlanType.FREE_TRIAL
+    start_date: datetime = Field(default_factory=datetime.utcnow)
+    end_date: datetime
+    is_active: bool = True
+    razorpay_payment_id: Optional[str] = None
+    razorpay_order_id: Optional[str] = None
+    amount_paid: float = 0.0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "subscriptions"
+
+
 class User(Document):
     email: Indexed(str, unique=True)
     hashed_password: str
     full_name: str
     role: UserRole = UserRole.USER
     created_by_id: Optional[str] = None
+    last_login_device_id: Optional[str] = None
+    last_login_ip: Optional[str] = None
+    # Employee Trial/Access fields
+    has_full_access: bool = False
+    trial_start_date: Optional[datetime] = None
+    trial_end_date: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 
     class Settings:
         name = "users"

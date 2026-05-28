@@ -121,6 +121,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
         <nav className="sidebar-nav" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', padding: '16px 0' }}>
           <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} />
           
+          {/* User-only: New Invoice shortcut + operational pages */}
           {user?.role === 'user' && (
             <>
               <SidebarLink to="/invoices/new" label="New Invoice" icon={PlusCircle} />
@@ -133,12 +134,21 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
             </>
           )}
 
+          {/* Super Admin: operational overview pages */}
+          {user?.role === 'super_admin' && (
+            <>
+              <SidebarLink to="/invoices" label="Transactions" icon={FileText} />
+              <SidebarLink to="/reports" label="Reports" icon={BarChart3} />
+            </>
+          )}
+
+          {/* Admin/Super Admin Management Section */}
           {(user?.role === 'super_admin' || user?.role === 'admin') && (
             <SidebarLink to="/admin/users" label={user?.role === 'super_admin' ? "Managers" : "Employees"} icon={UserPlus} />
           )}
           <SidebarLink to="/settings" label="Settings" icon={Settings} />
 
-          {/* New Invoice Button in Sidebar */}
+          {/* Floating New Invoice Button (User Only) */}
           {user?.role === 'user' && (
             <div style={{ padding: '20px 16px 10px 16px' }}>
               <button 
@@ -326,6 +336,18 @@ const App = () => {
   const [company, setCompany] = useState(null);
   const [logoVersion, setLogoVersion] = useState(Date.now());
 
+  const fetchMe = async () => {
+    if (!token) return;
+    try {
+      const res = await axios.get(`${API_BASE_URL}/auth/me`);
+      setUser(res.data);
+      localStorage.setItem('user', JSON.stringify(res.data));
+    } catch (err) {
+      console.error("Failed to refresh user data", err);
+      if (err.response?.status === 401) logout();
+    }
+  };
+
   const fetchCompany = async () => {
     if (!token) return;
     try {
@@ -376,6 +398,7 @@ const App = () => {
   useEffect(() => {
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      fetchMe();
       fetchCompany();
     }
     const interceptor = axios.interceptors.response.use(
@@ -384,6 +407,9 @@ const App = () => {
         if (error.response?.status === 401) {
           logout();
           window.location.href = '/login';
+        }
+        if (error.response?.status === 402) {
+          alert(error.response.data.detail || "Access restricted. Please contact your manager.");
         }
         return Promise.reject(error);
       }

@@ -7,7 +7,7 @@ import { Plus, Package, X, Search, Edit3, Trash2, ChevronDown, AlertTriangle, Al
 const DEFAULT_CATEGORIES = ['Product', 'Service', 'Parts', 'General'];
 const DEFAULT_UNITS = ['Units', 'Pcs', 'Hrs', 'Nos', 'Kg', 'Ltr', 'Mtr'];
 
-const Products = () => {
+const Products = ({ user }) => {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -138,29 +138,31 @@ const Products = () => {
             Manage your product catalog, pricing, and stock levels.
           </p>
         </div>
-        <button 
-          type="button"
-          onClick={() => setShowModal(true)} 
-          style={{ 
-            backgroundColor: 'var(--primary-color)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '10px 20px', 
-            fontSize: '13px',
-            fontWeight: '700',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'all 0.15s ease',
-            boxShadow: '0 2px 4px var(--primary-light)'
-          }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-hover)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--primary-color)'}
-        >
-          <Plus size={16} /> New Catalog Item
-        </button>
+        {user?.role !== 'admin' && (
+          <button 
+            type="button"
+            onClick={() => setShowModal(true)} 
+            style={{ 
+              backgroundColor: 'var(--primary-color)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '10px 20px', 
+              fontSize: '13px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.15s ease',
+              boxShadow: '0 2px 4px var(--primary-light)'
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-hover)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--primary-color)'}
+          >
+            <Plus size={16} /> New Catalog Item
+          </button>
+        )}
       </div>
 
       {/* Grid Row of 4 Redesigned Metrics Blocks */}
@@ -510,59 +512,63 @@ const Products = () => {
                   {/* Actions buttons */}
                   <td style={{ padding: '16px 24px', paddingRight: '32px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                      <button 
-                        type="button"
-                        onClick={() => handleEdit(p)}
-                        style={{
-                          border: 'none',
-                          backgroundColor: 'transparent',
-                          color: '#4b5563',
-                          cursor: 'pointer',
-                          padding: '6px',
-                          borderRadius: '6px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.15s ease'
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.backgroundColor = 'var(--primary-light)';
-                          e.currentTarget.style.color = 'var(--primary-color)';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.color = '#4b5563';
-                        }}
-                      >
-                        <Edit3 size={15} />
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => handleDelete(p.id)}
-                        style={{
-                          border: 'none',
-                          backgroundColor: 'transparent',
-                          color: '#ef4444',
-                          cursor: 'pointer',
-                          padding: '6px',
-                          borderRadius: '6px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.15s ease',
-                          opacity: 0.8
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.backgroundColor = '#fee2e2';
-                          e.currentTarget.style.opacity = '1';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.opacity = '0.8';
-                        }}
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      {user?.role !== 'admin' && (
+                        <button 
+                          type="button"
+                          onClick={() => handleEdit(p)}
+                          style={{
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            color: '#4b5563',
+                            cursor: 'pointer',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.backgroundColor = 'var(--primary-light)';
+                            e.currentTarget.style.color = 'var(--primary-color)';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.color = '#4b5563';
+                          }}
+                        >
+                          <Edit3 size={15} />
+                        </button>
+                      )}
+                      {user?.role !== 'admin' && (
+                        <button 
+                          type="button"
+                          onClick={() => handleDelete(p.id)}
+                          style={{
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease',
+                            opacity: 0.8
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.backgroundColor = '#fee2e2';
+                            e.currentTarget.style.opacity = '1';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                            e.currentTarget.style.opacity = '0.8';
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

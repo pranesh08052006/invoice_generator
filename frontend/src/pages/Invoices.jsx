@@ -10,6 +10,7 @@ import {
 const Invoices = ({ user }) => {
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
+  const [payments, setPayments] = useState([]);
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState(location.state?.clientName || '');
   const [activeTab, setActiveTab] = useState('ALL'); // ALL, PAID, UNPAID, DRAFT
@@ -50,9 +51,19 @@ const Invoices = ({ user }) => {
     }
   };
 
+  const fetchPayments = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/payments`);
+      setPayments(response.data || []);
+    } catch (err) {
+      console.error("Failed to fetch payments:", err);
+    }
+  };
+
   useEffect(() => { 
     fetchInvoices(); 
     fetchClients();
+    fetchPayments();
   }, []);
 
   const handleDownload = async (id, number) => {
@@ -228,6 +239,7 @@ const Invoices = ({ user }) => {
     try {
       await axios.patch(`${API_BASE_URL}/invoices/${inv.id}/status`, { status: newStatus });
       fetchInvoices();
+      fetchPayments();
     } catch (err) { 
       alert('Failed to update status');
     }
@@ -276,8 +288,8 @@ const Invoices = ({ user }) => {
   });
 
   const totalVolume = invoices.filter(inv => inv.status?.toLowerCase() !== 'draft').reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-  const paidInvoicesCount = invoices.filter(inv => inv.status?.toLowerCase() === 'paid').length;
-  const realizedRevenue = invoices.filter(inv => inv.status?.toLowerCase() !== 'draft').reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+  const unlinkedPayments = payments.filter(p => !p.invoice_id).reduce((sum, p) => sum + (p.amount || 0), 0);
+  const realizedRevenue = invoices.filter(inv => inv.status?.toLowerCase() !== 'draft').reduce((sum, inv) => sum + (inv.paid_amount || 0), 0) + unlinkedPayments;
   const pendingSettlement = totalVolume - realizedRevenue;
   const unpaidCount = invoices.filter(inv => inv.status?.toLowerCase() !== 'paid' && inv.status?.toLowerCase() !== 'draft').length;
   const draftCount = invoices.filter(inv => inv.status?.toLowerCase() === 'draft').length;
@@ -296,29 +308,31 @@ const Invoices = ({ user }) => {
             Manage and view all your invoice history.
           </p>
         </div>
-        <button 
-          type="button"
-          onClick={() => navigate('/invoices/new')} 
-          style={{ 
-            backgroundColor: 'var(--primary-color)',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '10px 20px', 
-            fontSize: '13px',
-            fontWeight: '700',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            transition: 'all 0.15s ease',
-            boxShadow: '0 2px 4px var(--primary-light)'
-          }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-hover)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--primary-color)'}
-        >
-          <Plus size={16} /> New Transaction
-        </button>
+        {user?.role !== 'admin' && (
+          <button 
+            type="button"
+            onClick={() => navigate('/invoices/new')} 
+            style={{ 
+              backgroundColor: 'var(--primary-color)',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '10px 20px', 
+              fontSize: '13px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.15s ease',
+              boxShadow: '0 2px 4px var(--primary-light)'
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--primary-hover)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--primary-color)'}
+          >
+            <Plus size={16} /> New Transaction
+          </button>
+        )}
       </div>
 
       {/* Grid row of 3 Premium Metrics cards */}
@@ -799,18 +813,20 @@ const Invoices = ({ user }) => {
                   <td style={{ padding: '16px 24px', paddingRight: '32px', textAlign: 'right' }}>
                     {isPaid ? (
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            setSelectedInvoice(inv);
-                            setDuplicateDate(new Date().toISOString().split('T')[0]);
-                            setShowDuplicateModal(true);
-                          }}
-                          style={{ border: 'none', backgroundColor: 'transparent', color: '#4b5563', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          title="Duplicate"
-                        >
-                          <Copy size={15} />
-                        </button>
+                        {user?.role !== 'admin' && (
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setSelectedInvoice(inv);
+                              setDuplicateDate(new Date().toISOString().split('T')[0]);
+                              setShowDuplicateModal(true);
+                            }}
+                            style={{ border: 'none', backgroundColor: 'transparent', color: '#4b5563', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            title="Duplicate"
+                          >
+                            <Copy size={15} />
+                          </button>
+                        )}
                         <button 
                           type="button"
                           onClick={() => handleView(inv.id)}
@@ -835,45 +851,49 @@ const Invoices = ({ user }) => {
                         >
                           <Share2 size={15} />
                         </button>
-                        <button 
-                          type="button"
-                          onClick={() => handleDelete(inv.id)}
-                          style={{ border: 'none', backgroundColor: 'transparent', color: '#64748b', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          title="Delete"
-                          onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
-                          onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {user?.role !== 'admin' && (
+                          <button 
+                            type="button"
+                            onClick={() => handleDelete(inv.id)}
+                            style={{ border: 'none', backgroundColor: 'transparent', color: '#64748b', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            title="Delete"
+                            onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
+                            onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center' }}>
-                        <button 
-                          type="button"
-                          onClick={() => toggleStatus(inv)}
-                          style={{
-                            padding: '6px 14px',
-                            fontSize: '12px',
-                            fontWeight: '700',
-                            backgroundColor: '#ffffff',
-                            color: '#10b981',
-                            border: '1px solid #10b981',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.backgroundColor = '#ecfdf5';
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.backgroundColor = '#ffffff';
-                          }}
-                        >
-                          Mark Paid
-                        </button>
+                        {user?.role !== 'admin' && (
+                          <button 
+                            type="button"
+                            onClick={() => toggleStatus(inv)}
+                            style={{
+                              padding: '6px 14px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              backgroundColor: '#ffffff',
+                              color: '#10b981',
+                              border: '1px solid #10b981',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.backgroundColor = '#ecfdf5';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.backgroundColor = '#ffffff';
+                            }}
+                          >
+                            Mark Paid
+                          </button>
+                        )}
                         <button 
                           type="button"
                           onClick={() => handleView(inv.id)}
@@ -882,28 +902,32 @@ const Invoices = ({ user }) => {
                         >
                           <Eye size={15} />
                         </button>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            setSelectedInvoice(inv);
-                            setDuplicateDate(new Date().toISOString().split('T')[0]);
-                            setShowDuplicateModal(true);
-                          }}
-                          style={{ border: 'none', backgroundColor: 'transparent', color: '#4b5563', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          title="More Options"
-                        >
-                          <MoreVertical size={16} />
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => handleDelete(inv.id)}
-                          style={{ border: 'none', backgroundColor: 'transparent', color: '#64748b', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                          title="Delete"
-                          onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
-                          onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {user?.role !== 'admin' && (
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setSelectedInvoice(inv);
+                              setDuplicateDate(new Date().toISOString().split('T')[0]);
+                              setShowDuplicateModal(true);
+                            }}
+                            style={{ border: 'none', backgroundColor: 'transparent', color: '#4b5563', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            title="More Options"
+                          >
+                            <MoreVertical size={16} />
+                          </button>
+                        )}
+                        {user?.role !== 'admin' && (
+                          <button 
+                            type="button"
+                            onClick={() => handleDelete(inv.id)}
+                            style={{ border: 'none', backgroundColor: 'transparent', color: '#64748b', cursor: 'pointer', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            title="Delete"
+                            onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; }}
+                            onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                     )}
                   </td>

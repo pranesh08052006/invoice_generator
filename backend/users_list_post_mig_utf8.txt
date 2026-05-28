@@ -1,0 +1,12 @@
+﻿User: Regular User, Email: user@system.com, Role: UserRole.USER
+  Access: False, Trial Start: 2026-05-27 09:07:02.662000, Trial End: 2026-06-03 09:07:02.662000
+User: Employee, Email: employee@system.com, Role: UserRole.USER
+  Access: False, Trial Start: 2026-05-27 09:09:48.827000, Trial End: 2026-06-03 09:09:48.827000
+User: Super Admin, Email: admin@system.com, Role: UserRole.SUPER_ADMIN
+  Access: False, Trial Start: 2026-05-27 09:15:10.154000, Trial End: 2026-06-03 09:15:10.154000
+User: Manager, Email: admin01@system.com, Role: UserRole.ADMIN
+  Access: False, Trial Start: 2026-05-28 08:23:19.770000, Trial End: 2026-06-04 08:23:19.770000
+User: user, Email: user01@system.com, Role: UserRole.USER
+  Access: False, Trial Start: 2026-05-28 08:24:00.052000, Trial End: 2026-06-04 08:24:00.052000
+User: user, Email: user02@system.com, Role: UserRole.USER
+  Access: False, Trial Start: 2026-05-28 08:55:33.613000, Trial End: 2026-06-04 08:55:33.613000

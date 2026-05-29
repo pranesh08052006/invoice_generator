@@ -51,10 +51,10 @@ class User(Document):
 
 class Company(Document):
     user_id: Indexed(str, unique=True)
-    name: str = "My Company"
-    address: str = "My Address"
+    name: Optional[str] = "My Company"
+    address: Optional[str] = "My Address"
     gst_number: Optional[str] = None
-    mobile: str = "0000000000"
+    mobile: Optional[str] = "0000000000"
     email: Optional[str] = None
     bank_name: Optional[str] = None
     account_no: Optional[str] = None
@@ -66,6 +66,7 @@ class Company(Document):
     logo_url: Optional[str] = None
     primary_color: Optional[str] = "#2563eb"
     secondary_color: Optional[str] = "#ffffff"
+    invoice_color: Optional[str] = "#f59e0b"
 
     class Settings:
         name = "company_details"

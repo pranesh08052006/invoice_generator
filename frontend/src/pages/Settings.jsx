@@ -24,6 +24,7 @@ const SettingsPage = ({ user, fetchCompanyGlobal }) => {
     upi_id: '',
     primary_color: '#2563eb',
     secondary_color: '#ffffff',
+    invoice_color: '#f59e0b',
     signature_url: '',
     logo_url: ''
   });
@@ -136,7 +137,9 @@ const SettingsPage = ({ user, fetchCompanyGlobal }) => {
       setSaved(true);
       setTimeout(() => setSaved(false), 4000);
     } catch (err) {
-      alert("Error saving company details");
+      console.error("Error saving company details:", err);
+      const errorMsg = err.response?.data?.detail || err.message || "Error saving company details";
+      alert(errorMsg);
     }
   };
 
@@ -556,13 +559,33 @@ const SettingsPage = ({ user, fetchCompanyGlobal }) => {
                 </div>
               </div>
 
+              {/* Color Panel 3: Invoice Template Color */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Invoice Template Theme</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ position: 'relative', width: '56px', height: '42px', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden', cursor: 'pointer' }}>
+                    <input 
+                      type="color" 
+                      style={{ position: 'absolute', top: '-6px', left: '-6px', width: '68px', height: '54px', border: 'none', padding: 0, cursor: 'pointer' }}
+                      value={company.invoice_color || '#f59e0b'} 
+                      onChange={e => setCompany({...company, invoice_color: e.target.value})} 
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#111827', fontFamily: 'monospace' }}>{(company.invoice_color || '#f59e0b').toUpperCase()}</span>
+                    <span style={{ fontSize: '11px', color: '#6b7280' }}>Invoice headers and highlight colors</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Default Theme Button Option */}
               <button
                 type="button"
                 onClick={() => setCompany({
                   ...company,
                   primary_color: '#2563eb',
-                  secondary_color: '#ffffff'
+                  secondary_color: '#ffffff',
+                  invoice_color: '#f59e0b'
                 })}
                 style={{
                   height: '42px',

@@ -1,0 +1,61 @@
+
+--- ERROR AT 2026-05-29 14:33:24.741471 ---
+Traceback (most recent call last):
+  File "D:\invoice_generator\backend\main.py", line 406, in save_company_details
+    await company.save()
+  File "C:\Users\prane\AppData\Local\Programs\Python\Python311\Lib\site-packages\beanie\odm\actions.py", line 239, in wrapper
+    result = await f(
+             ^^^^^^^^
+  File "C:\Users\prane\AppData\Local\Programs\Python\Python311\Lib\site-packages\beanie\odm\utils\state.py", line 85, in wrapper
+    result = await f(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prane\AppData\Local\Programs\Python\Python311\Lib\site-packages\beanie\odm\utils\self_validation.py", line 19, in wrapper
+    return await f(self, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prane\AppData\Local\Programs\Python\Python311\Lib\site-packages\beanie\odm\documents.py", line 611, in save
+    return await self.update(
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prane\AppData\Local\Programs\Python\Python311\Lib\site-packages\beanie\odm\actions.py", line 239, in wrapper
+    result = await f(
+             ^^^^^^^^
+  File "C:\Users\prane\AppData\Local\Programs\Python\Python311\Lib\site-packages\beanie\odm\utils\state.py", line 85, in wrapper
+    result = await f(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prane\AppData\Local\Programs\Python\Python311\Lib\site-packages\beanie\odm\documents.py", line 728, in update
+    result = await self.find_one(find_query).update(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prane\AppData\Local\Programs\Python\Python311\Lib\site-packages\beanie\odm\queries\update.py", line 351, in __await__
+    update_result = yield from self._update().__await__()
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prane\AppData\Local\Programs\Python\Python311\Lib\site-packages\beanie\odm\queries\update.py", line 329, in _update
+    result = parse_obj(self.document_model, result)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prane\AppData\Local\Programs\Python\Python311\Lib\site-packages\beanie\odm\utils\parsing.py", line 146, in parse_obj
+    result = parse_model(model, data)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prane\AppData\Local\Programs\Python\Python311\Lib\site-packages\beanie\odm\utils\pydantic.py", line 37, in parse_model
+    return model_type.model_validate(data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\prane\AppData\Local\Programs\Python\Python311\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 3 validation errors for Company
+name
+  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.12/v/string_type
+address
+  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.12/v/string_type
+mobile
+  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.12/v/string_type
+Error: 3 validation errors for Company
+name
+  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.12/v/string_type
+address
+  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.12/v/string_type
+mobile
+  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]
+    For further information visit https://errors.pydantic.dev/2.12/v/string_type

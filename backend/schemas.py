@@ -30,7 +30,7 @@ class CompanyCreate(BaseModel):
     address: str
     gst_number: Optional[str] = None
     mobile: str
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
     bank_name: Optional[str] = None
     account_no: Optional[str] = None
     ifsc: Optional[str] = None
@@ -41,6 +41,9 @@ class CompanyCreate(BaseModel):
     logo_url: Optional[str] = None
     primary_color: Optional[str] = "#2563eb"
     secondary_color: Optional[str] = "#ffffff"
+    invoice_color: Optional[str] = "#f59e0b"
+    class Config:
+        extra = "ignore"
 
 class CompanyOut(BaseModel):
     name: str
@@ -58,6 +61,7 @@ class CompanyOut(BaseModel):
     logo_url: Optional[str] = None
     primary_color: Optional[str] = "#2563eb"
     secondary_color: Optional[str] = "#ffffff"
+    invoice_color: Optional[str] = "#f59e0b"
     class Config:
         from_attributes = True
 

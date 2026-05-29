@@ -43,7 +43,8 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
     styles = getSampleStyleSheet()
     
     # Colors
-    primary_orange = colors.HexColor("#f59e0b")
+    # Colors
+    primary_orange = colors.HexColor(business_details.get("invoice_color", "#f59e0b"))
     text_dark = colors.HexColor("#000000")
     
     # Fonts: Standard ReportLab names for Times New Roman

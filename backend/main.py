@@ -382,8 +382,14 @@ async def get_company_details(user: User = Depends(get_current_user)):
 async def save_company_details(company_in: CompanyCreate, user: User = Depends(get_current_user)):
     try:
         data = company_in.dict()
+        print(f"DEBUG SAVE: received data: {data}")
         # Clean data: remove IDs and handle empty strings
-        clean_data = {k: (v if v != "" else None) for k, v in data.items() if k not in ['id', 'user_id', '_id']}
+        clean_data = {
+            k: (v if v != "" or k in ['name', 'address', 'mobile'] else None) 
+            for k, v in data.items() 
+            if k not in ['id', 'user_id', '_id']
+        }
+        print(f"DEBUG SAVE: clean_data: {clean_data}")
         
         uid = str(user.id)
         company = await Company.find_one({"user_id": uid})
@@ -395,13 +401,22 @@ async def save_company_details(company_in: CompanyCreate, user: User = Depends(g
         # Update fields
         for k, v in clean_data.items():
             if hasattr(company, k):
+                # Update field
                 setattr(company, k, v)
         
+        print(f"DEBUG SAVE: saving company: {company.dict()}")
         await company.save()
+        print("DEBUG SAVE: company saved successfully")
         return company
             
     except Exception as e:
-        print(f"ERROR SAVING COMPANY: {str(e)}")
+        import traceback
+        with open("d:/invoice_generator/backend/save_error.txt", "a") as f:
+            f.write(f"\n--- ERROR AT {datetime.now()} ---\n")
+            f.write(f"Received data: {data}\n")
+            f.write(f"Clean data: {clean_data}\n")
+            f.write(traceback.format_exc())
+            f.write(f"Error: {str(e)}\n")
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/company/logo")
@@ -1469,6 +1484,7 @@ def _build_business_details(saved_company, user):
             "gst": saved_company.gst_number,
             "signature_url": getattr(saved_company, 'signature_url', None),
             "logo_url": getattr(saved_company, 'logo_url', None),
+            "invoice_color": getattr(saved_company, 'invoice_color', "#f59e0b"),
             "bank": {
                 "bank_name": saved_company.bank_name or "N/A",
                 "account_no": saved_company.account_no or "N/A",
@@ -1483,6 +1499,7 @@ def _build_business_details(saved_company, user):
         "email": user.email,
         "phone": "+91 9876543210",
         "gst": "33AABCA1234A1Z1",
+        "invoice_color": "#f59e0b",
         "bank": {"bank_name": "N/A", "account_no": "N/A", "ifsc": "N/A", "account_type": "Current", "account_holder_name": user.full_name}
     }
 

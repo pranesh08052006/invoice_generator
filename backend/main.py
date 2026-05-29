@@ -39,8 +39,8 @@ async def lifespan(app: FastAPI):
     admin_exists = await User.find_one(User.role == UserRole.SUPER_ADMIN)
     if not admin_exists:
         super_admin = User(
-            email="admin@system.com",
-            hashed_password=get_password_hash("admin123"),
+            email="sadmin1@system.com",
+            hashed_password=get_password_hash("sadmin@123"),
             full_name="Super Admin",
             role=UserRole.SUPER_ADMIN
         )

@@ -1069,6 +1069,65 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
                 <p style={{ color: '#6b7280', fontSize: '13px', margin: 0 }}>No items added yet. Start by adding a line item.</p>
               </div>
             )}
+
+            <div style={{ 
+              padding: '16px 32px', 
+              borderTop: '1px solid #eaedf3', 
+              backgroundColor: '#f8fafc',
+              display: 'flex',
+              gap: '16px',
+              alignItems: 'center'
+            }}>
+              <button 
+                type="button" 
+                onClick={() => setItems([...items, { product_id: '', product_name: '', quantity: '', price: '', gst_percent: 0, discount_value: 0, discount_type: 'percentage' }])}
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  padding: '8px 16px',
+                  color: '#374151',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = '#f9fafb';
+                  e.currentTarget.style.borderColor = '#9ca3af';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#d1d5db';
+                }}
+              >
+                <Plus size={14} style={{ color: 'var(--primary-color)' }} /> Add Item Row
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setShowProductModal(true)}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  color: 'var(--primary-color)',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--primary-hover)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--primary-color)'}
+              >
+                <Package size={14} /> Add from Inventory
+              </button>
+            </div>
           </div>
 
           {/* Card: Payment Context */}

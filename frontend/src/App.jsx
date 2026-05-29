@@ -134,13 +134,8 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
             </>
           )}
 
-          {/* Super Admin: operational overview pages */}
-          {user?.role === 'super_admin' && (
-            <>
-              <SidebarLink to="/invoices" label="Transactions" icon={FileText} />
-              <SidebarLink to="/reports" label="Reports" icon={BarChart3} />
-            </>
-          )}
+          {/* Super Admin Management Section is now consolidated below */}
+
 
           {/* Admin/Super Admin Management Section */}
           {(user?.role === 'super_admin' || user?.role === 'admin') && (

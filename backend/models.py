@@ -38,7 +38,7 @@ class User(Document):
     created_by_id: Optional[str] = None
     last_login_device_id: Optional[str] = None
     last_login_ip: Optional[str] = None
-    # Employee Trial/Access fields
+    # User Trial/Access fields
     has_full_access: bool = False
     trial_start_date: Optional[datetime] = None
     trial_end_date: Optional[datetime] = None

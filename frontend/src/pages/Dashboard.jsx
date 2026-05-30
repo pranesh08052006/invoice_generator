@@ -436,7 +436,7 @@ const Dashboard = ({ user }) => {
           <>
             <StatsCard title="Total Revenue" value={`₹${stats?.total_sales?.toLocaleString() || 0}`} icon={TrendingUp} trend="+12.5%" />
             <StatsCard title="Active Managers" value={stats?.total_admins || 0} icon={ShieldCheck} subtext="Supervising networks" />
-            <StatsCard title="Total Employees" value={stats?.total_users || 0} icon={Users} subtext="Operating globally" />
+            <StatsCard title="Total Users" value={stats?.total_users || 0} icon={Users} subtext="Operating globally" />
             <StatsCard title="Invoices Issued" value={stats?.total_invoices || 0} icon={FileText} subtext="Completed bills" />
           </>
         ) : user?.role === 'admin' ? (

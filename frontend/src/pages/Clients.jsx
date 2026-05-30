@@ -11,7 +11,7 @@ const Clients = ({ user, company }) => {
   const [invoices, setInvoices] = useState([]);
   const [quotations, setQuotations] = useState([]);
   const [proformas, setProformas] = useState([]);
-  const [transactionTab, setTransactionTab] = useState('INVOICES'); // INVOICES, QUOTATIONS, PROFORMA, PAYMENTS
+  const [transactionTab, setTransactionTab] = useState('ALL'); // ALL, INVOICES, QUOTATIONS, PROFORMA, PAYMENTS
   const [payments, setPayments] = useState([]);
 
   // Payment recording modal state
@@ -939,16 +939,16 @@ const Clients = ({ user, company }) => {
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-            zIndex: 9999
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, padding: '20px'
           }}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
           <div style={{
-            backgroundColor: '#ffffff', height: '100%', width: '100%', maxWidth: '580px',
-            boxShadow: '-10px 0 25px -5px rgba(0, 0, 0, 0.1), -5px 0 10px -5px rgba(0, 0, 0, 0.04)',
-            borderLeft: '1px solid #eaedf3', display: 'flex', flexDirection: 'column',
-            animation: 'slideInRight 0.25s ease-out'
+            backgroundColor: '#ffffff', maxHeight: '90vh', width: '100%', maxWidth: '580px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            borderRadius: '16px', display: 'flex', flexDirection: 'column',
+            animation: 'fadeIn 0.2s ease-out', border: '1px solid #eaedf3'
           }}>
             
             {/* Header */}
@@ -1231,11 +1231,14 @@ const Clients = ({ user, company }) => {
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(255, 255, 255, 0.7)',
           backdropFilter: 'blur(8px)',
-          zIndex: 100, display: 'flex', justifyContent: 'flex-end'
+          zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '20px'
         }}>
           <div style={{
-            width: '600px', backgroundColor: '#ffffff', height: '100vh',
-            boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.05)', display: 'flex', flexDirection: 'column'
+            width: '600px', backgroundColor: '#ffffff', maxHeight: '90vh',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', 
+            borderRadius: '16px', display: 'flex', flexDirection: 'column',
+            animation: 'fadeIn 0.2s ease-out', border: '1px solid #eaedf3'
           }}>
             {/* Header */}
             <div style={{ 
@@ -1337,8 +1340,10 @@ const Clients = ({ user, company }) => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Transaction History</span>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button 
-                    type="button" 
+                  {transactionTab !== 'ALL' && (
+                    <>
+                      <button 
+                        type="button" 
                     onClick={() => {
                       let activeDocs = [];
                       if (transactionTab === 'INVOICES') activeDocs = invoices.filter(inv => inv.client_id === viewingClient.id);
@@ -1393,12 +1398,14 @@ const Clients = ({ user, company }) => {
                   >
                     <FileText size={12} /> Statement PDF
                   </button>
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* Transaction Tab Navigation */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #eaedf3' }}>
-                {['INVOICES', 'QUOTATIONS', 'PROFORMA', 'PAYMENTS'].map((tab) => (
+                {['ALL', 'INVOICES', 'QUOTATIONS', 'PROFORMA', 'PAYMENTS'].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setTransactionTab(tab)}
@@ -1424,28 +1431,34 @@ const Clients = ({ user, company }) => {
                   <thead>
                     <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #eaedf3' }}>
                       <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
-                        {transactionTab === 'PAYMENTS' ? 'Date' : 'Ref #'}
+                        {(transactionTab === 'PAYMENTS' || transactionTab === 'ALL') ? 'Date' : 'Ref #'}
                       </th>
                       <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
-                        {transactionTab === 'PAYMENTS' ? 'Method' : 'Date'}
+                        {transactionTab === 'PAYMENTS' ? 'Method' : transactionTab === 'ALL' ? 'Type / Ref' : 'Date'}
                       </th>
                       <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
-                        {transactionTab === 'PAYMENTS' ? 'Notes' : 'Status'}
+                        {transactionTab === 'PAYMENTS' ? 'Notes' : transactionTab === 'ALL' ? 'Status / Notes' : 'Status'}
                       </th>
                       <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', textAlign: 'right' }}>Amount</th>
-                      {transactionTab !== 'PAYMENTS' && <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>Actions</th>}
+                      {transactionTab !== 'PAYMENTS' && <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', textAlign: 'right' }}>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {(() => {
                       let activeDocs = [];
-                      if (transactionTab === 'INVOICES') activeDocs = invoices.filter(inv => inv.client_id === viewingClient.id);
+                      if (transactionTab === 'ALL') {
+                        const invs = invoices.filter(inv => inv.client_id === viewingClient.id).map(i => ({ ...i, __type: 'INVOICE' }));
+                        const quots = quotations.filter(q => q.client_id === viewingClient.id).map(q => ({ ...q, __type: 'QUOTATION' }));
+                        const profs = proformas.filter(p => p.client_id === viewingClient.id).map(p => ({ ...p, __type: 'PROFORMA' }));
+                        const pays = (payments || []).filter(p => p.client_id === viewingClient.id).map(p => ({ ...p, __type: 'PAYMENT' }));
+                        activeDocs = [...invs, ...quots, ...profs, ...pays];
+                      } else if (transactionTab === 'INVOICES') activeDocs = invoices.filter(inv => inv.client_id === viewingClient.id);
                       else if (transactionTab === 'QUOTATIONS') activeDocs = quotations.filter(q => q.client_id === viewingClient.id);
                       else if (transactionTab === 'PROFORMA') activeDocs = proformas.filter(p => p.client_id === viewingClient.id);
                       else if (transactionTab === 'PAYMENTS') activeDocs = (payments || []).filter(p => p.client_id === viewingClient.id);
 
                       if (activeDocs.length === 0) {
-                        return <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '13px' }}>No {transactionTab.toLowerCase()}{transactionTab === 'PAYMENTS' ? '' : 's'} found for this customer.</td></tr>;
+                        return <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '13px' }}>No {transactionTab === 'ALL' ? 'transactions' : transactionTab.toLowerCase() + (transactionTab === 'PAYMENTS' ? '' : 's')} found for this customer.</td></tr>;
                       }
 
                       if (transactionTab === 'PAYMENTS') {
@@ -1475,14 +1488,41 @@ const Clients = ({ user, company }) => {
                       }
 
                       return activeDocs
-                        .sort((a, b) => new Date(b.date) - new Date(a.date))
-                        .map(doc => {
+                        .sort((a, b) => new Date(b.date || b.payment_date || b.created_at) - new Date(a.date || a.payment_date || a.created_at))
+                        .map((doc, idx) => {
+                          const isPayment = transactionTab === 'ALL' && doc.__type === 'PAYMENT';
+                          
+                          if (isPayment) {
+                            return (
+                              <tr key={`pay-${doc.id || idx}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#6b7280' }}>
+                                  {new Date(doc.payment_date || doc.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#111827' }}>
+                                  Payment ({doc.payment_method || 'CASH'})
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#6b7280', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {doc.notes || '-'}
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '700', textAlign: 'right', color: '#16a34a' }}>
+                                  ₹{(doc.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </td>
+                                <td style={{ padding: '12px 16px' }}></td>
+                              </tr>
+                            );
+                          }
+
                           const docNumber = doc.invoice_number || doc.quotation_number || doc.proforma_number;
+                          const docTypeLabel = doc.__type ? doc.__type.charAt(0) + doc.__type.slice(1).toLowerCase() : 'Document';
+                          const typeString = transactionTab === 'ALL' ? doc.__type : transactionTab.slice(0, -1);
+                          
                           return (
-                            <tr key={doc.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                              <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#111827' }}>{docNumber}</td>
+                            <tr key={`${doc.__type || 'doc'}-${doc.id || idx}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#111827' }}>
+                                {transactionTab === 'ALL' ? new Date(doc.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : docNumber}
+                              </td>
                               <td style={{ padding: '12px 16px', fontSize: '13px', color: '#6b7280' }}>
-                                {new Date(doc.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                                {transactionTab === 'ALL' ? `${docTypeLabel} (${docNumber})` : new Date(doc.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                               </td>
                               <td style={{ padding: '12px 16px' }}>
                                 <span style={{ 
@@ -1497,10 +1537,10 @@ const Clients = ({ user, company }) => {
                                 ₹{(doc.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </td>
                               <td style={{ padding: '12px 16px' }}>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                  <button type="button" onClick={() => handleView(doc.id, transactionTab.slice(0, -1))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280' }} title="View"><Eye size={14} /></button>
-                                  <button type="button" onClick={() => handleDownload(doc.id, docNumber, transactionTab.slice(0, -1))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280' }} title="Download PDF"><Download size={14} /></button>
-                                  <button type="button" onClick={() => handleShare(doc.id, docNumber, transactionTab.slice(0, -1))} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280' }} title="Share PDF"><Share2 size={14} /></button>
+                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                  <button type="button" onClick={() => handleView(doc.id, typeString)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280' }} title="View"><Eye size={14} /></button>
+                                  <button type="button" onClick={() => handleDownload(doc.id, docNumber, typeString)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280' }} title="Download PDF"><Download size={14} /></button>
+                                  <button type="button" onClick={() => handleShare(doc.id, docNumber, typeString)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280' }} title="Share PDF"><Share2 size={14} /></button>
                                 </div>
                               </td>
                             </tr>

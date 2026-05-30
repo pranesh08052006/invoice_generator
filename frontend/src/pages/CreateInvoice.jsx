@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE_URL from '../config';
@@ -161,6 +162,9 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
           product_id: value, 
           product_name: prod.name, 
           price: prod.price, 
+          quantity: newItems[index].quantity && parseFloat(newItems[index].quantity) > 0
+            ? newItems[index].quantity   // keep existing quantity if already set
+            : 1,                         // default to 1 when item first selected
           discount_value: prod.discount_value || 0,
           discount_type: prod.discount_type || 'percentage',
           gst_percent: prod.gst_percent 
@@ -207,6 +211,12 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
   };
 
   const { gross, itemDiscount, taxable, gst, total } = calculate();
+
+  useEffect(() => {
+    if (type === 'invoice') {
+      setInvoice(prev => ({ ...prev, paid_amount: total }));
+    }
+  }, [total, type]);
 
   const selectedClientInvoices = invoices.filter(inv => inv.client_id === invoice.client_id);
   const selectedClientTotal = selectedClientInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
@@ -539,7 +549,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
       </div>
 
       {/* Main Grid: Parameters / Lines on left, Summary / Action sidebar on right */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '32px', alignItems: 'start' }}>
+      <div className="invoice-layout-grid">
         
         {/* Left Column Workspace */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -1340,7 +1350,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
         </div>
 
         {/* Right Sidebar Column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', position: 'sticky', top: '24px' }}>
+        <div className="invoice-summary-col">
           
           {/* Card: Summary Details */}
           <div className="card" style={{ padding: '28px', backgroundColor: '#ffffff', border: '1px solid #eaedf3', borderRadius: '12px' }}>
@@ -1536,22 +1546,22 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
         </div>
       </div>
 
-      {/* Quick Customer Addition Drawer */}
-      {showClientModal && (
+      {/* Quick Customer Creation Modal */}
+      {showClientModal && createPortal((
         <div 
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end',
-            zIndex: 9999
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, padding: '20px'
           }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowClientModal(false); }}
         >
           <div style={{
-            backgroundColor: '#ffffff', height: '100vh', width: '100%', maxWidth: '580px',
-            boxShadow: '-10px 0 25px -5px rgba(0, 0, 0, 0.1), -5px 0 10px -5px rgba(0, 0, 0, 0.04)',
-            borderLeft: '1px solid #eaedf3', display: 'flex', flexDirection: 'column',
-            animation: 'slideInRight 0.25s ease-out', overflow: 'hidden'
+            backgroundColor: '#ffffff', maxHeight: '90vh', width: '100%', maxWidth: '580px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            borderRadius: '16px', display: 'flex', flexDirection: 'column',
+            animation: 'fadeIn 0.2s ease-out', overflow: 'hidden', border: '1px solid #eaedf3'
           }}>
             {/* Header */}
             <div style={{ 
@@ -1759,24 +1769,24 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* Quick Product Addition Modal */}
-      {showProductModal && (
+      {showProductModal && createPortal((
         <div 
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end',
-            zIndex: 9999
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, padding: '20px'
           }}
           onClick={(e) => { if (e.target === e.currentTarget) setShowProductModal(false); }}
         >
           <div style={{
-            backgroundColor: '#ffffff', height: '100vh', width: '100%', maxWidth: '580px',
-            boxShadow: '-10px 0 25px -5px rgba(0, 0, 0, 0.1), -5px 0 10px -5px rgba(0, 0, 0, 0.04)',
-            borderLeft: '1px solid #eaedf3', display: 'flex', flexDirection: 'column',
-            animation: 'slideInRight 0.25s ease-out', overflow: 'hidden'
+            backgroundColor: '#ffffff', maxHeight: '90vh', width: '100%', maxWidth: '580px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            borderRadius: '16px', display: 'flex', flexDirection: 'column',
+            animation: 'fadeIn 0.2s ease-out', overflow: 'hidden', border: '1px solid #eaedf3'
           }}>
             {/* Header */}
             <div style={{ 
@@ -2022,10 +2032,10 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
 
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* Invoice Preview PDF Overlay Modal */}
-      {showPreview && (
+      {showPreview && createPortal((
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
@@ -2141,10 +2151,10 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* Quick Payment Method Addition Modal */}
-      {showPaymentMethodModal && (
+      {showPaymentMethodModal && createPortal((
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
@@ -2212,7 +2222,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 };

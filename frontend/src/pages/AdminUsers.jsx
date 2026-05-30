@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import API_BASE_URL from '../config';
-import { UserPlus, Trash2, Shield, User, Mail, Plus, X, Lock, Key, Check } from 'lucide-react';
+import { UserPlus, Trash2, Shield, User, Mail, Plus, X, Lock, Key, Check, AlertTriangle } from 'lucide-react';
 
 const AdminUsers = ({ user }) => {
   const [users, setUsers] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
+  const [deleteInput, setDeleteInput] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [newUser, setNewUser] = useState({ 
     full_name: '', 
     email: '', 
@@ -35,18 +38,30 @@ const AdminUsers = ({ user }) => {
       });
       fetchUsers();
     } catch (err) {
-      alert('Error creating user. Check if the email is unique.');
+      const msg = err?.response?.data?.detail || 'Error creating user. Check if the email is unique.';
+      alert(msg);
     }
   };
 
-  const handleDelete = async (userId) => {
-    if (window.confirm('Are you sure you want to remove this user from the organization?')) {
-      try {
-        await axios.delete(`${API_BASE_URL}/admin/users/${userId}`);
-        fetchUsers();
-      } catch (err) {
-        alert('Error removing user');
-      }
+  // Step 1: click trash → open confirmation modal
+  const handleDeleteClick = (u) => {
+    setDeleteConfirm({ id: u.id, name: u.full_name, email: u.email });
+    setDeleteInput('');
+  };
+
+  // Step 2: confirm deletion after typing DELETE
+  const handleDeleteConfirm = async () => {
+    if (deleteInput !== 'DELETE') return;
+    setDeleteLoading(true);
+    try {
+      await axios.delete(`${API_BASE_URL}/admin/users/${deleteConfirm.id}`);
+      setDeleteConfirm(null);
+      setDeleteInput('');
+      fetchUsers();
+    } catch (err) {
+      alert('Error removing user. Please try again.');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -181,7 +196,12 @@ const AdminUsers = ({ user }) => {
                 </td>
                 <td style={{ textAlign: 'right' }}>
                   {u.role !== 'super_admin' && (
-                    <button className="logout-btn" onClick={() => handleDelete(u.id)} title="Deprovision Account">
+                    <button
+                      className="logout-btn"
+                      onClick={() => handleDeleteClick(u)}
+                      title="Deprovision Account"
+                      style={{ color: '#ef4444' }}
+                    >
                       <Trash2 size={16} />
                     </button>
                   )}
@@ -193,6 +213,7 @@ const AdminUsers = ({ user }) => {
       </div>
     </div>
 
+      {/* ── Provision Account Modal ── */}
       {showModal && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '480px' }}>
@@ -231,6 +252,165 @@ const AdminUsers = ({ user }) => {
                   Provision Access Account
                 </button>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteConfirm && (
+        <div className="modal-overlay" style={{ zIndex: 200 }}>
+          <div className="modal-content" style={{ maxWidth: '440px', border: '1px solid rgba(239,68,68,0.3)' }}>
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '20px 24px',
+              borderBottom: '1px solid #fef2f2',
+              backgroundColor: '#fff5f5',
+              borderRadius: '12px 12px 0 0'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '36px', height: '36px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid rgba(239,68,68,0.3)',
+                  borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <AlertTriangle size={18} color="#ef4444" />
+                </div>
+                <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#111827', margin: 0 }}>
+                  Confirm Account Removal
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setDeleteConfirm(null); setDeleteInput(''); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '4px' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '24px' }}>
+              {/* User info card */}
+              <div style={{
+                backgroundColor: '#f8fafc',
+                border: '1px solid #eaedf3',
+                borderRadius: '8px',
+                padding: '14px 16px',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <div style={{
+                  width: '38px', height: '38px',
+                  backgroundColor: '#ef4444',
+                  borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontWeight: '800', fontSize: '15px', flexShrink: 0
+                }}>
+                  {deleteConfirm.name[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: '#111827' }}>{deleteConfirm.name}</div>
+                  <div style={{ fontSize: '12px', color: '#6b7280' }}>{deleteConfirm.email}</div>
+                </div>
+              </div>
+
+              <p style={{ fontSize: '13px', color: '#374151', lineHeight: '1.6', marginBottom: '8px' }}>
+                This action is <strong>permanent and irreversible</strong>. All data associated with this account — including invoices, clients, products, and payments — will be permanently deleted.
+              </p>
+              <p style={{ fontSize: '13px', color: '#6b7280', lineHeight: '1.6', marginBottom: '20px' }}>
+                To confirm, type <strong style={{ color: '#ef4444', fontFamily: 'monospace' }}>DELETE</strong> in the box below:
+              </p>
+
+              <input
+                type="text"
+                placeholder="Type DELETE to confirm"
+                value={deleteInput}
+                onChange={e => setDeleteInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && deleteInput === 'DELETE') handleDeleteConfirm(); }}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  border: `2px solid ${deleteInput === 'DELETE' ? '#ef4444' : '#eaedf3'}`,
+                  borderRadius: '8px',
+                  padding: '0 14px',
+                  fontSize: '14px',
+                  fontFamily: 'monospace',
+                  fontWeight: '700',
+                  outline: 'none',
+                  transition: 'border-color 0.2s ease',
+                  boxSizing: 'border-box',
+                  color: '#111827',
+                  letterSpacing: '0.05em'
+                }}
+                autoFocus
+              />
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setDeleteConfirm(null); setDeleteInput(''); }}
+                  style={{
+                    flex: 1,
+                    height: '42px',
+                    backgroundColor: '#f3f4f6',
+                    border: '1px solid #eaedf3',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    color: '#374151',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#e5e7eb'}
+                  onMouseLeave={e => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteConfirm}
+                  disabled={deleteInput !== 'DELETE' || deleteLoading}
+                  style={{
+                    flex: 1,
+                    height: '42px',
+                    backgroundColor: deleteInput === 'DELETE' && !deleteLoading ? '#ef4444' : '#fca5a5',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    color: '#ffffff',
+                    cursor: deleteInput === 'DELETE' && !deleteLoading ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.15s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                  onMouseEnter={e => { if (deleteInput === 'DELETE' && !deleteLoading) e.currentTarget.style.backgroundColor = '#dc2626'; }}
+                  onMouseLeave={e => { if (deleteInput === 'DELETE' && !deleteLoading) e.currentTarget.style.backgroundColor = '#ef4444'; }}
+                >
+                  {deleteLoading ? (
+                    <>
+                      <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      Removing...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={15} />
+                      Remove Account
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

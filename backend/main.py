@@ -115,13 +115,13 @@ async def check_subscription(user: User):
             detail="Subscription expired. Please renew to continue."
         )
 
-async def check_employee_restriction(user: User, action_type: str, is_create: bool = True):
+async def check_user_restriction(user: User, action_type: str, is_create: bool = True):
     # Super Admin is exempt from all restrictions
     if user.role == UserRole.SUPER_ADMIN:
         return
     
     # NEW RULE: Managers (ADMIN) are RESTRICTED from modifying transactional data.
-    # They can view data and manage employees, but cannot create/edit/delete transactions.
+    # They can view data and manage users, but cannot create/edit/delete transactions.
     if user.role == UserRole.ADMIN:
         if action_type in ["invoice", "product", "client", "quotation", "proforma", "payment"]:
             raise HTTPException(
@@ -257,7 +257,7 @@ async def create_managed_user(
             raise HTTPException(status_code=403, detail="Super Admins can only create managers (Admins)")
         
         if current_user.role == UserRole.ADMIN and user_in.role != UserRole.USER:
-            raise HTTPException(status_code=403, detail="Managers can only create employees (Users)")
+            raise HTTPException(status_code=403, detail="Managers can only create users (Users)")
         
         existing = await User.find_one(User.email == user_in.email)
         if existing:
@@ -349,20 +349,28 @@ async def delete_managed_user(
     
     if current_user.role == UserRole.ADMIN:
         if target_user.role != UserRole.USER or target_user.created_by_id != str(current_user.id):
-            raise HTTPException(status_code=403, detail="Managers can only remove their own Employees")
+            raise HTTPException(status_code=403, detail="Managers can only remove their own Users")
     
+    async def _purge_user_data(uid: str):
+        """Completely remove all data associated with a user ID."""
+        await Invoice.find(Invoice.user_id == uid).delete()
+        await Client.find(Client.user_id == uid).delete()
+        await Product.find(Product.user_id == uid).delete()
+        await Quotation.find(Quotation.user_id == uid).delete()
+        await ProformaInvoice.find(ProformaInvoice.user_id == uid).delete()
+        await PaymentRecord.find(PaymentRecord.user_id == uid).delete()
+        await StockAdjustment.find(StockAdjustment.user_id == uid).delete()
+        await Company.find(Company.user_id == uid).delete()
+        await Subscription.find(Subscription.user_id == uid).delete()
+
     # Cascade delete in MongoDB
     if target_user.role == UserRole.ADMIN:
         subordinates = await User.find(User.created_by_id == str(target_user.id)).to_list()
         for sub in subordinates:
-            await Invoice.find(Invoice.user_id == str(sub.id)).delete()
-            await Client.find(Client.user_id == str(sub.id)).delete()
-            await Product.find(Product.user_id == str(sub.id)).delete()
+            await _purge_user_data(str(sub.id))
             await sub.delete()
     
-    await Invoice.find(Invoice.user_id == user_id).delete()
-    await Client.find(Client.user_id == user_id).delete()
-    await Product.find(Product.user_id == user_id).delete()
+    await _purge_user_data(user_id)
     await target_user.delete()
     
     return {"detail": "User removed successfully"}
@@ -479,7 +487,7 @@ async def create_client(
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
     await check_subscription(user)
-    await check_employee_restriction(user, "client")
+    await check_user_restriction(user, "client")
     try:
         new_client = Client(**client_in.dict(), user_id=str(user.id))
         await new_client.insert()
@@ -531,7 +539,7 @@ async def update_client(
     client_in: ClientCreate,
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
-    await check_employee_restriction(user, "client", is_create=False)
+    await check_user_restriction(user, "client", is_create=False)
     client = await Client.get(client_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -548,7 +556,7 @@ async def delete_client(
     client_id: str,
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
-    await check_employee_restriction(user, "client", is_create=False)
+    await check_user_restriction(user, "client", is_create=False)
     client = await Client.get(client_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
@@ -564,7 +572,7 @@ async def create_product(
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
     await check_subscription(user)
-    await check_employee_restriction(user, "product")
+    await check_user_restriction(user, "product")
     try:
         new_product = Product(**product_in.dict(), user_id=str(user.id))
         await new_product.insert()
@@ -594,7 +602,7 @@ async def update_product(
     product_in: ProductCreate,
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
-    await check_employee_restriction(user, "product", is_create=False)
+    await check_user_restriction(user, "product", is_create=False)
     product = await Product.get(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -643,7 +651,7 @@ async def create_invoice(
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
     await check_subscription(user)
-    await check_employee_restriction(user, "invoice")
+    await check_user_restriction(user, "invoice")
     try:
         existing = await Invoice.find_one(Invoice.user_id == str(user.id), Invoice.invoice_number == invoice_in.invoice_number)
         if existing:
@@ -730,7 +738,7 @@ async def update_invoice_status(
     status_in: dict,
     user: User = Depends(get_current_user)
 ):
-    await check_employee_restriction(user, "invoice", is_create=False)
+    await check_user_restriction(user, "invoice", is_create=False)
     invoice = await Invoice.get(invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -960,7 +968,7 @@ async def delete_invoice(
     invoice_id: str,
     user: User = Depends(get_current_user)
 ):
-    await check_employee_restriction(user, "invoice", is_create=False)
+    await check_user_restriction(user, "invoice", is_create=False)
     invoice = await Invoice.get(invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -977,7 +985,7 @@ async def update_invoice(
     invoice_in: InvoiceCreate,
     user: User = Depends(get_current_user)
 ):
-    await check_employee_restriction(user, "invoice", is_create=False)
+    await check_user_restriction(user, "invoice", is_create=False)
     invoice = await Invoice.get(invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -1064,7 +1072,7 @@ async def create_quotation(
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
     await check_subscription(user)
-    await check_employee_restriction(user, "quotation")
+    await check_user_restriction(user, "quotation")
     try:
         sub_total, total_gst, items = _calc_items(q_in.items)
         disc = 0
@@ -1152,7 +1160,7 @@ async def get_quotations(user: User = Depends(get_current_user)):
 
 @app.delete("/quotations/{quotation_id}")
 async def delete_quotation(quotation_id: str, user: User = Depends(get_current_user)):
-    await check_employee_restriction(user, "quotation", is_create=False)
+    await check_user_restriction(user, "quotation", is_create=False)
     q = await Quotation.get(quotation_id)
     if not q:
         raise HTTPException(status_code=404, detail="Quotation not found")
@@ -1169,7 +1177,7 @@ async def convert_quotation_to_invoice(
     user: User = Depends(get_current_user)
 ):
     """Convert a quotation to a full invoice."""
-    await check_employee_restriction(user, "invoice")
+    await check_user_restriction(user, "invoice")
     q = await Quotation.get(quotation_id)
     if not q:
         raise HTTPException(status_code=404, detail="Quotation not found")
@@ -1274,7 +1282,7 @@ async def create_proforma(
     user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))
 ):
     await check_subscription(user)
-    await check_employee_restriction(user, "proforma")
+    await check_user_restriction(user, "proforma")
     try:
         sub_total, total_gst, items = _calc_items(p_in.items)
         disc = 0
@@ -1357,7 +1365,7 @@ async def get_proformas(user: User = Depends(get_current_user)):
 
 @app.delete("/proformas/{proforma_id}")
 async def delete_proforma(proforma_id: str, user: User = Depends(get_current_user)):
-    await check_employee_restriction(user, "proforma", is_create=False)
+    await check_user_restriction(user, "proforma", is_create=False)
     p = await ProformaInvoice.get(proforma_id)
     if not p:
         raise HTTPException(status_code=404, detail="Proforma not found")
@@ -1373,7 +1381,7 @@ async def convert_proforma_to_invoice(
     body: dict,
     user: User = Depends(get_current_user)
 ):
-    await check_employee_restriction(user, "invoice")
+    await check_user_restriction(user, "invoice")
     p = await ProformaInvoice.get(proforma_id)
     if not p:
         raise HTTPException(status_code=404, detail="Proforma not found")
@@ -1569,7 +1577,7 @@ async def create_payment(
     user: User = Depends(get_current_user)
 ):
     await check_subscription(user)
-    await check_employee_restriction(user, "payment")
+    await check_user_restriction(user, "payment")
     payment = PaymentRecord(
         user_id=str(user.id),
         client_id=pay_in.client_id,

@@ -164,7 +164,47 @@ const SettingsPage = ({ user, fetchCompanyGlobal }) => {
             Manage your company profile, financial details, and application preferences.
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative' }}>
+          
+          {/* Settings Saved Toast Notification */}
+          {saved && (
+            <div style={{
+              position: 'absolute',
+              top: 'calc(100% + 12px)',
+              right: '0',
+              backgroundColor: '#111827',
+              color: '#ffffff',
+              borderRadius: '12px',
+              padding: '16px 20px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              zIndex: 99999,
+              animation: 'fadeIn 0.2s ease-out',
+              width: '360px',
+              justifyContent: 'space-between',
+              border: '1px solid rgba(255, 255, 255, 0.05)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <CheckCircle2 size={16} style={{ color: '#10b981' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#ffffff' }}>Settings Saved</span>
+                  <span style={{ fontSize: '11.5px', color: '#9ca3af', marginTop: '2px' }}>Your business profile has been updated.</span>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setSaved(false)}
+                style={{ border: 'none', backgroundColor: 'transparent', color: '#9ca3af', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
           <button 
             type="button"
             onClick={() => navigate('/dashboard')}
@@ -708,44 +748,6 @@ const SettingsPage = ({ user, fetchCompanyGlobal }) => {
         </div>
       </div>
 
-      {/* Styled Charcoal Absolute Toast Notification */}
-      {saved && (
-        <div style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          backgroundColor: '#111827',
-          color: '#ffffff',
-          borderRadius: '12px',
-          padding: '16px 20px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          zIndex: 99999,
-          animation: 'slideInUp 0.2s ease-out',
-          width: '360px',
-          justifyContent: 'space-between',
-          border: '1px solid rgba(255, 255, 255, 0.05)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <CheckCircle2 size={16} style={{ color: '#10b981' }} />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#ffffff' }}>Settings Saved Successfully</span>
-              <span style={{ fontSize: '11.5px', color: '#9ca3af', marginTop: '2px' }}>Your business profile has been updated.</span>
-            </div>
-          </div>
-          <button 
-            type="button"
-            onClick={() => setSaved(false)}
-            style={{ border: 'none', backgroundColor: 'transparent', color: '#9ca3af', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
     </div>
   );
 };

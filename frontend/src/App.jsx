@@ -59,7 +59,17 @@ const SidebarLink = ({ to, label, icon: Icon }) => (
   </NavLink>
 );
 
+// ── Scroll to top on every route change ──
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [pathname]);
+  return null;
+};
+
 const AppLayout = ({ user, logout, company, logoVersion, children }) => {
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -139,7 +149,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
 
           {/* Admin/Super Admin Management Section */}
           {(user?.role === 'super_admin' || user?.role === 'admin') && (
-            <SidebarLink to="/admin/users" label={user?.role === 'super_admin' ? "Managers" : "Employees"} icon={UserPlus} />
+            <SidebarLink to="/admin/users" label={user?.role === 'super_admin' ? "Managers" : "Users"} icon={UserPlus} />
           )}
           <SidebarLink to="/settings" label="Settings" icon={Settings} />
 
@@ -203,13 +213,11 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
       <main className="main-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Top Header */}
         <header className="top-header" style={{
-          height: '64px',
           backgroundColor: '#ffffff',
           borderBottom: '1px solid #eaedf3',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 40px',
           position: 'sticky',
           top: 0,
           zIndex: 90
@@ -309,7 +317,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
         </header>
 
         {/* Content Wrapper */}
-        <div className="content-wrapper" style={{ padding: '40px', flex: 1, backgroundColor: '#f8fafc' }}>
+        <div className="content-wrapper" style={{ flex: 1, backgroundColor: '#f8fafc' }}>
           {children}
         </div>
       </main>
@@ -416,6 +424,7 @@ const App = () => {
 
   return (
     <Router>
+      <ScrollToTop />
       {!isLoggedIn ? (
         <Routes>
           <Route path="/login" element={<Login login={login} />} />

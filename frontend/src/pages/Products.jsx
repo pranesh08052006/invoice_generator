@@ -633,16 +633,16 @@ const Products = ({ user }) => {
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-            zIndex: 9999
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, padding: '20px'
           }}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
           <div style={{
-            backgroundColor: '#ffffff', height: '100%', width: '100%', maxWidth: '580px',
-            boxShadow: '-10px 0 25px -5px rgba(0, 0, 0, 0.1), -5px 0 10px -5px rgba(0, 0, 0, 0.04)',
-            borderLeft: '1px solid #eaedf3', display: 'flex', flexDirection: 'column',
-            animation: 'slideInRight 0.25s ease-out'
+            backgroundColor: '#ffffff', maxHeight: '90vh', width: '100%', maxWidth: '580px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            borderRadius: '16px', display: 'flex', flexDirection: 'column',
+            animation: 'fadeIn 0.2s ease-out', border: '1px solid #eaedf3'
           }}>
             
             {/* Header */}

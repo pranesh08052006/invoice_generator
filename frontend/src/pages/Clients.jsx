@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE_URL from '../config';
 
-import { Search, Plus, Phone, MessageSquare, Hash, X, MapPin, Edit3, Trash2, User, ChevronDown, Layout, Eye, Download, Share2, FileText, CreditCard } from 'lucide-react';
+import { Search, Plus, Phone, MessageSquare, Hash, X, MapPin, Edit3, Trash2, User, ChevronDown, Layout, Eye, Download, Share2, FileText, CreditCard, AlertTriangle } from 'lucide-react';
 
 const Clients = ({ user, company }) => {
   const navigate = useNavigate();
@@ -20,6 +20,8 @@ const Clients = ({ user, company }) => {
   const [savingPayment, setSavingPayment] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [viewingClient, setViewingClient] = useState(null);
+  const [clientToDelete, setClientToDelete] = useState(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -380,11 +382,18 @@ const Clients = ({ user, company }) => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this customer? This action cannot be undone.')) return;
+  const initiateDelete = (client) => {
+    setClientToDelete(client);
+    setDeleteConfirmationText('');
+  };
+
+  const confirmDelete = async () => {
+    if (!clientToDelete) return;
     try {
-      await axios.delete(`${API_BASE_URL}/clients/${id}`);
+      await axios.delete(`${API_BASE_URL}/clients/${clientToDelete.id}`);
       fetchClients();
+      setClientToDelete(null);
+      setDeleteConfirmationText('');
     } catch (err) {
       alert('Error deleting client');
     }
@@ -630,11 +639,14 @@ const Clients = ({ user, company }) => {
                 .reduce((sum, p) => sum + (p.amount || 0), 0);
               
               const totalPaid = totalPaidInvoices + totalSpecificPayments;
-              const outstandingBalance = totalInvoiced - totalPaid;
+              const outstandingBalance = Math.max(0, totalInvoiced - totalPaid);
               return (
                 <tr 
                   key={c.id} 
-                  onClick={() => setViewingClient(c)}
+                  onClick={() => {
+                    setViewingClient(c);
+                    setTransactionTab('ALL');
+                  }}
                   style={{ borderBottom: '1px solid #f1f5f9', transition: 'all 0.15s ease', cursor: 'pointer' }}
                   onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
                   onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -849,7 +861,7 @@ const Clients = ({ user, company }) => {
                       {user?.role !== 'admin' && (
                         <button 
                           type="button"
-                          onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
+                          onClick={(e) => { e.stopPropagation(); initiateDelete(c); }}
                           style={{
                             border: 'none',
                             backgroundColor: 'transparent',
@@ -1235,7 +1247,7 @@ const Clients = ({ user, company }) => {
           padding: '20px'
         }}>
           <div style={{
-            width: '600px', backgroundColor: '#ffffff', maxHeight: '90vh',
+            width: '900px', maxWidth: '95vw', backgroundColor: '#ffffff', maxHeight: '90vh',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', 
             borderRadius: '16px', display: 'flex', flexDirection: 'column',
             animation: 'fadeIn 0.2s ease-out', border: '1px solid #eaedf3'
@@ -1315,7 +1327,7 @@ const Clients = ({ user, company }) => {
                     .reduce((sum, p) => sum + (p.amount || 0), 0);
                     
                   const totalPaid = totalPaidOnInvoices + totalSpecificPayments;
-                  const balance = totalRevenue - totalPaid;
+                  const balance = Math.max(0, totalRevenue - totalPaid);
                   
                   return (
                     <>
@@ -1439,7 +1451,11 @@ const Clients = ({ user, company }) => {
                       <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase' }}>
                         {transactionTab === 'PAYMENTS' ? 'Notes' : transactionTab === 'ALL' ? 'Status / Notes' : 'Status'}
                       </th>
-                      <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', textAlign: 'right' }}>Amount</th>
+                      <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', textAlign: 'right' }}>
+                        {transactionTab === 'PAYMENTS' ? 'Amount' : 'Total'}
+                      </th>
+                      {transactionTab !== 'PAYMENTS' && <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', textAlign: 'right' }}>Paid</th>}
+                      {transactionTab !== 'PAYMENTS' && <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', textAlign: 'right' }}>Balance</th>}
                       {transactionTab !== 'PAYMENTS' && <th style={{ padding: '12px 16px', fontSize: '10px', fontWeight: '700', color: '#4b5563', textTransform: 'uppercase', textAlign: 'right' }}>Actions</th>}
                     </tr>
                   </thead>
@@ -1458,7 +1474,7 @@ const Clients = ({ user, company }) => {
                       else if (transactionTab === 'PAYMENTS') activeDocs = (payments || []).filter(p => p.client_id === viewingClient.id);
 
                       if (activeDocs.length === 0) {
-                        return <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '13px' }}>No {transactionTab === 'ALL' ? 'transactions' : transactionTab.toLowerCase() + (transactionTab === 'PAYMENTS' ? '' : 's')} found for this customer.</td></tr>;
+                        return <tr><td colSpan={transactionTab === 'PAYMENTS' ? 4 : 7} style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '13px' }}>No {transactionTab === 'ALL' ? 'transactions' : transactionTab.toLowerCase() + (transactionTab === 'PAYMENTS' ? '' : 's')} found for this customer.</td></tr>;
                       }
 
                       if (transactionTab === 'PAYMENTS') {
@@ -1504,9 +1520,11 @@ const Clients = ({ user, company }) => {
                                 <td style={{ padding: '12px 16px', fontSize: '13px', color: '#6b7280', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {doc.notes || '-'}
                                 </td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', color: '#9ca3af', fontSize: '13px' }}>-</td>
                                 <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '700', textAlign: 'right', color: '#16a34a' }}>
                                   ₹{(doc.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', color: '#9ca3af', fontSize: '13px' }}>-</td>
                                 <td style={{ padding: '12px 16px' }}></td>
                               </tr>
                             );
@@ -1535,6 +1553,12 @@ const Clients = ({ user, company }) => {
                               </td>
                               <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '700', textAlign: 'right', color: '#111827' }}>
                                 ₹{(doc.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', textAlign: 'right', color: '#16a34a' }}>
+                                ₹{(doc.paid_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', textAlign: 'right', color: '#ef4444' }}>
+                                ₹{((doc.total_amount || 0) - (doc.paid_amount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </td>
                               <td style={{ padding: '12px 16px' }}>
                                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
@@ -1572,6 +1596,37 @@ const Clients = ({ user, company }) => {
               <button onClick={() => setShowPaymentModal(false)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#9ca3af' }}><X size={18} /></button>
             </div>
             <form onSubmit={handleRecordPayment} style={{ padding: '24px' }}>
+              {(() => {
+                const clientInvoices = invoices.filter(inv => inv.client_id === viewingClient?.id);
+                const totalRevenue = clientInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+                const totalPaidOnInvoices = clientInvoices.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0);
+                const totalSpecificPayments = (payments || [])
+                  .filter(p => p.client_id === viewingClient?.id)
+                  .reduce((sum, p) => sum + (p.amount || 0), 0);
+                  
+                const totalPaidBeforeThis = totalPaidOnInvoices + totalSpecificPayments;
+                const outstandingBalance = totalRevenue - totalPaidBeforeThis;
+                
+                const currentlyPaying = parseFloat(paymentForm.amount) || 0;
+                const newBalance = outstandingBalance - currentlyPaying;
+
+                return (
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+                    <div style={{ flex: 1, padding: '12px', backgroundColor: '#fef2f2', borderRadius: '8px', border: '1px solid #fee2e2' }}>
+                      <span style={{ display: 'block', fontSize: '10px', fontWeight: '800', color: '#ef4444', textTransform: 'uppercase', marginBottom: '4px' }}>Outstanding</span>
+                      <span style={{ fontSize: '14px', fontWeight: '800', color: '#111827' }}>₹{outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div style={{ flex: 1, padding: '12px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #dcfce7' }}>
+                      <span style={{ display: 'block', fontSize: '10px', fontWeight: '800', color: '#16a34a', textTransform: 'uppercase', marginBottom: '4px' }}>Paying Now</span>
+                      <span style={{ fontSize: '14px', fontWeight: '800', color: '#111827' }}>₹{currentlyPaying.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div style={{ flex: 1, padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <span style={{ display: 'block', fontSize: '10px', fontWeight: '800', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>New Balance</span>
+                      <span style={{ fontSize: '14px', fontWeight: '800', color: '#111827' }}>₹{newBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                );
+              })()}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#4b5563', marginBottom: '6px', textTransform: 'uppercase' }}>Amount (₹)</label>
                 <input 
@@ -1716,6 +1771,73 @@ const Clients = ({ user, company }) => {
           scrollbar-width: none;
         }
       `}</style>
+      {/* Delete Confirmation Modal */}
+      {clientToDelete && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '400px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            overflow: 'hidden',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <div style={{ padding: '24px', borderBottom: '1px solid #eaedf3' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#ef4444', marginBottom: '12px' }}>
+                <AlertTriangle size={24} />
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800' }}>Delete Customer</h3>
+              </div>
+              <p style={{ margin: 0, fontSize: '14px', color: '#475569', lineHeight: '1.5' }}>
+                This action is permanent and cannot be undone. All invoices, quotations, and payments associated with this customer will be permanently removed.
+              </p>
+            </div>
+            <div style={{ padding: '24px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
+                Please type <strong style={{ color: '#0f172a' }}>DELETE</strong> to confirm.
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmationText}
+                onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                placeholder="DELETE"
+                style={{
+                  width: '100%', padding: '10px 14px', borderRadius: '8px',
+                  border: '1px solid #cbd5e1', fontSize: '14px',
+                  outline: 'none', transition: 'border-color 0.15s ease',
+                  boxSizing: 'border-box'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
+              />
+            </div>
+            <div style={{ padding: '16px 24px', backgroundColor: '#f8fafc', display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid #eaedf3' }}>
+              <button 
+                onClick={() => setClientToDelete(null)}
+                style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#475569', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmDelete}
+                disabled={deleteConfirmationText !== 'DELETE'}
+                style={{ 
+                  padding: '10px 16px', borderRadius: '8px', border: 'none', 
+                  backgroundColor: deleteConfirmationText === 'DELETE' ? '#ef4444' : '#fca5a5', 
+                  color: '#ffffff', fontSize: '14px', fontWeight: '600', 
+                  cursor: deleteConfirmationText === 'DELETE' ? 'pointer' : 'not-allowed',
+                  transition: 'background-color 0.2s ease'
+                }}
+              >
+                Delete Customer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

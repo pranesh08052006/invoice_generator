@@ -331,8 +331,8 @@ const Dashboard = ({ user }) => {
   const totalPaidInvoices = allInvoices.filter(inv => inv.status?.toUpperCase() === 'PAID').length;
   const totalUnpaidInvoices = allInvoices.filter(inv => inv.status?.toUpperCase() !== 'PAID' && inv.status?.toUpperCase() !== 'DRAFT').length;
   const unlinkedPmtsSum = allPayments.filter(p => !p.invoice_id).reduce((sum, p) => sum + (p.amount || 0), 0);
-  const pendingAmount = allInvoices.filter(inv => inv.status?.toUpperCase() !== 'DRAFT')
-    .reduce((sum, inv) => sum + ((inv.total_amount || 0) - (inv.paid_amount || 0)), 0) - unlinkedPmtsSum;
+  const pendingAmount = Math.max(0, allInvoices.filter(inv => inv.status?.toUpperCase() !== 'DRAFT')
+    .reduce((sum, inv) => sum + ((inv.total_amount || 0) - (inv.paid_amount || 0)), 0) - unlinkedPmtsSum);
 
   const calculateDaysLeft = () => {
     if (user?.has_full_access) return null;

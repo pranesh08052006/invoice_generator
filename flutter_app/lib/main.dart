@@ -34,6 +34,7 @@ class MyApp extends ConsumerWidget {
     final theme = AppTheme.buildTheme(
       company?['primary_color'],
       company?['secondary_color'],
+      company?['invoice_color'],
     );
 
     return MaterialApp.router(

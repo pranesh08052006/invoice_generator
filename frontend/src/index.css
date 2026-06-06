@@ -83,9 +83,9 @@ body {
 /* Layout Structure */
 .app-container {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;         /* exact viewport height — no outer scroll */
   width: 100%;
-  overflow-x: hidden;   /* contain sidebar slide-out animation only */
+  overflow: hidden;      /* prevent the page body from scrolling */
   background-color: var(--bg-app);
 }
 
@@ -165,6 +165,8 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;          /* allow shrink inside flex parent */
+  height: 100vh;         /* lock main area to viewport height */
+  overflow: hidden;      /* prevent outer page scroll */
 }
 
 
@@ -197,6 +199,9 @@ body {
   min-width: 0;
   box-sizing: border-box;
   overflow-x: auto;      /* scroll rather than clip if content overflows */
+  overflow-y: auto;      /* only this area scrolls vertically */
+  flex: 1;               /* fill remaining height inside main-area */
+  height: 0;             /* required so flex + overflow-y works correctly */
 }
 
 
@@ -452,9 +457,11 @@ tr:hover td {
 .invoice-summary-col {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   position: sticky;
-  top: 24px;
+  top: 0;
+  max-height: calc(100vh - 64px - 80px); /* viewport - header - content padding */
+  overflow-y: auto;
   min-width: 0;
   width: 100%;
 }

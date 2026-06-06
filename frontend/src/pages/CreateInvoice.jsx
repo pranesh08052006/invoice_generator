@@ -1353,10 +1353,10 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
         <div className="invoice-summary-col">
           
           {/* Card: Summary Details */}
-          <div className="card" style={{ padding: '28px', backgroundColor: '#ffffff', border: '1px solid #eaedf3', borderRadius: '12px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#111827', margin: '0 0 20px 0', letterSpacing: '-0.01em' }}>Invoice Summary</h3>
+          <div className="card" style={{ padding: '20px', backgroundColor: '#ffffff', border: '1px solid #eaedf3', borderRadius: '12px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#111827', margin: '0 0 16px 0', letterSpacing: '-0.01em' }}>Invoice Summary</h3>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
                 <span style={{ color: '#6b7280', fontWeight: '500' }}>Gross Total</span>
                 <span style={{ fontWeight: '600', color: '#111827' }}>₹{gross.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
@@ -1406,14 +1406,14 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
           </div>
 
           {/* Card: Action Panel */}
-          <div className="card" style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid #eaedf3', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="card" style={{ padding: '16px', backgroundColor: '#ffffff', border: '1px solid #eaedf3', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <button 
               type="button"
               onClick={(e) => handleSubmit(e, true)}
               disabled={loading}
               style={{
                 width: '100%',
-                height: '42px',
+                height: '38px',
                 backgroundColor: '#ffffff',
                 border: '1px solid #e2e8f0',
                 borderRadius: '8px',
@@ -1439,7 +1439,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
               disabled={loading}
               style={{
                 width: '100%',
-                height: '42px',
+                height: '38px',
                 backgroundColor: '#ffffff',
                 border: '1px solid #e2e8f0',
                 borderRadius: '8px',
@@ -1464,7 +1464,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
               onClick={handleDiscard}
               style={{
                 width: '100%',
-                height: '42px',
+                height: '38px',
                 backgroundColor: '#ffffff',
                 border: '1px solid #fee2e2',
                 borderRadius: '8px',
@@ -1494,7 +1494,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
               disabled={loading}
               style={{
                 width: '100%',
-                height: '42px',
+                height: '38px',
                 backgroundColor: '#10b981',
                 border: 'none',
                 borderRadius: '8px',
@@ -1522,7 +1522,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
               disabled={loading}
               style={{
                 width: '100%',
-                height: '42px',
+                height: '38px',
                 backgroundColor: 'var(--primary-color)',
                 border: 'none',
                 borderRadius: '8px',

@@ -72,9 +72,31 @@ async def get_ancestors(user: User) -> List[str]:
         current = parent
     return ids
 
+# Helper to get descendant IDs
+async def get_all_descendants(user_id: str) -> List[str]:
+    descendants = []
+    children = await User.find(User.created_by_id == user_id).to_list()
+    for child in children:
+        descendants.append(str(child.id))
+        descendants.extend(await get_all_descendants(str(child.id)))
+    return descendants
+
+# Helper to get all organization user IDs (top admin + descendants)
+async def get_org_user_ids(user: User) -> List[str]:
+    if user.role == UserRole.SUPER_ADMIN:
+        return []
+    ancestors = await get_ancestors(user)
+    top_admin_id = ancestors[-1]
+    descendants = await get_all_descendants(top_admin_id)
+    return [top_admin_id] + descendants
+
 async def check_subscription(user: User):
     # Super Admin is exempt
     if user.role == UserRole.SUPER_ADMIN:
+        return
+    
+    # Users with explicitly granted full access are exempt
+    if user.role == UserRole.USER and user.has_full_access:
         return
     
     user_ids = await get_ancestors(user)
@@ -406,10 +428,13 @@ async def save_company_details(company_in: CompanyCreate, user: User = Depends(g
             company = Company(user_id=uid)
             await company.insert()
             
-        # Update fields
+        # Update fields — but NEVER overwrite image URLs with None
+        # (logo/signature are updated only via their dedicated upload endpoints)
+        IMAGE_FIELDS = {'logo_url', 'signature_url'}
         for k, v in clean_data.items():
             if hasattr(company, k):
-                # Update field
+                if k in IMAGE_FIELDS and v is None:
+                    continue  # preserve existing image URL
                 setattr(company, k, v)
         
         print(f"DEBUG SAVE: saving company: {company.dict()}")
@@ -515,7 +540,8 @@ async def get_clients(user: User = Depends(check_role([UserRole.SUPER_ADMIN, Use
     if user.role == UserRole.SUPER_ADMIN:
         clients = await Client.find_all().to_list()
     else:
-        clients = await Client.find(Client.user_id == str(user.id)).to_list()
+        org_ids = await get_org_user_ids(user)
+        clients = await Client.find(In(Client.user_id, org_ids)).to_list()
     
     return [
         {
@@ -543,7 +569,7 @@ async def update_client(
     client = await Client.get(client_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    if user.role != UserRole.SUPER_ADMIN and client.user_id != str(user.id):
+    if user.role != UserRole.SUPER_ADMIN and client.user_id not in await get_org_user_ids(user):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     for key, value in client_in.dict().items():
@@ -560,7 +586,7 @@ async def delete_client(
     client = await Client.get(client_id)
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
-    if user.role != UserRole.SUPER_ADMIN and client.user_id != str(user.id):
+    if user.role != UserRole.SUPER_ADMIN and client.user_id not in await get_org_user_ids(user):
         raise HTTPException(status_code=403, detail="Not authorized")
     await client.delete()
     return {"message": "Client deleted"}
@@ -588,7 +614,8 @@ async def get_products(user: User = Depends(check_role([UserRole.SUPER_ADMIN, Us
     if user.role == UserRole.SUPER_ADMIN:
         products = await Product.find_all().to_list()
     else:
-        products = await Product.find(Product.user_id == str(user.id)).to_list()
+        org_ids = await get_org_user_ids(user)
+        products = await Product.find(In(Product.user_id, org_ids)).to_list()
     return [
         {
             "id": str(p.id),
@@ -606,7 +633,7 @@ async def update_product(
     product = await Product.get(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    if user.role != UserRole.SUPER_ADMIN and product.user_id != str(user.id):
+    if user.role != UserRole.SUPER_ADMIN and product.user_id not in await get_org_user_ids(user):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     for key, value in product_in.dict().items():
@@ -622,7 +649,7 @@ async def delete_product(
     product = await Product.get(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    if user.role != UserRole.SUPER_ADMIN and product.user_id != str(user.id):
+    if user.role != UserRole.SUPER_ADMIN and product.user_id not in await get_org_user_ids(user):
         raise HTTPException(status_code=403, detail="Not authorized")
     await product.delete()
     return {"message": "Product deleted"}
@@ -746,12 +773,9 @@ async def update_invoice_status(
     can_update = False
     if user.role == UserRole.SUPER_ADMIN:
         can_update = True
-    elif user.role == UserRole.ADMIN:
-        creator = await User.get(invoice.user_id)
-        if str(creator.id) == str(user.id) or creator.created_by_id == str(user.id):
-            can_update = True
-    elif user.role == UserRole.USER:
-        if invoice.user_id == str(user.id):
+    elif user.role in [UserRole.ADMIN, UserRole.USER]:
+        org_ids = await get_org_user_ids(user)
+        if invoice.user_id in org_ids:
             can_update = True
             
     if not can_update:
@@ -772,12 +796,9 @@ async def get_invoices(user: User = Depends(get_current_user)):
     try:
         if user.role == UserRole.SUPER_ADMIN:
             invoices = await Invoice.find_all().to_list()
-        elif user.role == UserRole.ADMIN:
-            descendant_ids = await get_all_descendants(str(user.id))
-            all_involved_ids = [str(user.id)] + descendant_ids
-            invoices = await Invoice.find(In(Invoice.user_id, all_involved_ids)).to_list()
         else:
-            invoices = await Invoice.find(Invoice.user_id == str(user.id)).to_list()
+            org_ids = await get_org_user_ids(user)
+            invoices = await Invoice.find(In(Invoice.user_id, org_ids)).to_list()
         
         # Filter out soft-deleted invoices and sort newest first
         invoices = [inv for inv in invoices if not getattr(inv, 'is_deleted', False)]
@@ -972,7 +993,7 @@ async def delete_invoice(
     invoice = await Invoice.get(invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    if user.role != UserRole.SUPER_ADMIN and invoice.user_id != str(user.id):
+    if user.role != UserRole.SUPER_ADMIN and invoice.user_id not in await get_org_user_ids(user):
         raise HTTPException(status_code=403, detail="Not authorized")
     invoice.is_deleted = True
     await invoice.save()
@@ -989,7 +1010,7 @@ async def update_invoice(
     invoice = await Invoice.get(invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    if user.role != UserRole.SUPER_ADMIN and invoice.user_id != str(user.id):
+    if user.role != UserRole.SUPER_ADMIN and invoice.user_id not in await get_org_user_ids(user):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     sub_total = 0
@@ -1119,7 +1140,8 @@ async def get_quotations(user: User = Depends(get_current_user)):
         if user.role == UserRole.SUPER_ADMIN:
             quotations = await Quotation.find_all().to_list()
         else:
-            quotations = await Quotation.find(Quotation.user_id == str(user.id)).to_list()
+            org_ids = await get_org_user_ids(user)
+            quotations = await Quotation.find(In(Quotation.user_id, org_ids)).to_list()
         quotations = [q for q in quotations if not getattr(q, 'is_deleted', False)]
         quotations.sort(key=lambda x: x.created_at, reverse=True)
 
@@ -1164,11 +1186,56 @@ async def delete_quotation(quotation_id: str, user: User = Depends(get_current_u
     q = await Quotation.get(quotation_id)
     if not q:
         raise HTTPException(status_code=404, detail="Quotation not found")
-    if user.role != UserRole.SUPER_ADMIN and q.user_id != str(user.id):
+    if user.role != UserRole.SUPER_ADMIN and q.user_id not in await get_org_user_ids(user):
         raise HTTPException(status_code=403, detail="Not authorized")
     q.is_deleted = True
     await q.save()
     return {"detail": "Quotation deleted"}
+
+@app.put("/quotations/{quotation_id}")
+async def update_quotation(
+    quotation_id: str,
+    q_in: QuotationCreate,
+    user: User = Depends(get_current_user)
+):
+    await check_user_restriction(user, "quotation", is_create=False)
+    q = await Quotation.get(quotation_id)
+    if not q:
+        raise HTTPException(status_code=404, detail="Quotation not found")
+    if user.role != UserRole.SUPER_ADMIN and q.user_id not in await get_org_user_ids(user):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    sub_total, total_gst, items = _calc_items(q_in.items)
+    disc = 0
+    if q_in.discount_type == "percentage":
+        disc = (sub_total * (q_in.discount_value or 0)) / 100
+    else:
+        disc = q_in.discount_value or 0
+    total = sub_total + total_gst - disc
+
+    valid_until = None
+    if q_in.valid_until:
+        try:
+            valid_until = datetime.fromisoformat(q_in.valid_until)
+        except Exception:
+            valid_until = None
+
+    q.client_id = q_in.client_id
+    q.quotation_number = q_in.quotation_number
+    q.sub_total = sub_total
+    q.total_gst = total_gst
+    q.total_amount = total
+    q.discount_value = q_in.discount_value or 0
+    q.discount_type = q_in.discount_type
+    q.is_gst = q_in.is_gst
+    q.payment_terms = q_in.payment_terms
+    q.delivery_details = q_in.delivery_details
+    q.notes = q_in.notes
+    q.valid_until = valid_until
+    q.items = items
+
+    await q.save()
+    return {"id": str(q.id), "quotation_number": q.quotation_number, "total_amount": q.total_amount, "status": q.status}
 
 @app.post("/quotations/{quotation_id}/convert")
 async def convert_quotation_to_invoice(
@@ -1181,7 +1248,7 @@ async def convert_quotation_to_invoice(
     q = await Quotation.get(quotation_id)
     if not q:
         raise HTTPException(status_code=404, detail="Quotation not found")
-    if user.role != UserRole.SUPER_ADMIN and q.user_id != str(user.id):
+    if user.role != UserRole.SUPER_ADMIN and q.user_id not in await get_org_user_ids(user):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     invoice_number = body.get("invoice_number", f"INV-{q.quotation_number}")
@@ -1323,7 +1390,8 @@ async def get_proformas(user: User = Depends(get_current_user)):
         if user.role == UserRole.SUPER_ADMIN:
             proformas = await ProformaInvoice.find_all().to_list()
         else:
-            proformas = await ProformaInvoice.find(ProformaInvoice.user_id == str(user.id)).to_list()
+            org_ids = await get_org_user_ids(user)
+            proformas = await ProformaInvoice.find(In(ProformaInvoice.user_id, org_ids)).to_list()
         proformas = [p for p in proformas if not getattr(p, 'is_deleted', False)]
         proformas.sort(key=lambda x: x.created_at, reverse=True)
 
@@ -1369,11 +1437,50 @@ async def delete_proforma(proforma_id: str, user: User = Depends(get_current_use
     p = await ProformaInvoice.get(proforma_id)
     if not p:
         raise HTTPException(status_code=404, detail="Proforma not found")
-    if user.role != UserRole.SUPER_ADMIN and p.user_id != str(user.id):
+    if user.role != UserRole.SUPER_ADMIN and p.user_id not in await get_org_user_ids(user):
         raise HTTPException(status_code=403, detail="Not authorized")
     p.is_deleted = True
     await p.save()
     return {"detail": "Proforma deleted"}
+
+@app.put("/proformas/{proforma_id}")
+async def update_proforma(
+    proforma_id: str,
+    p_in: ProformaCreate,
+    user: User = Depends(get_current_user)
+):
+    await check_user_restriction(user, "proforma", is_create=False)
+    p = await ProformaInvoice.get(proforma_id)
+    if not p:
+        raise HTTPException(status_code=404, detail="Proforma invoice not found")
+    if user.role != UserRole.SUPER_ADMIN and p.user_id not in await get_org_user_ids(user):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    sub_total, total_gst, items = _calc_items(p_in.items)
+    disc = 0
+    if p_in.discount_type == "percentage":
+        disc = (sub_total * (p_in.discount_value or 0)) / 100
+    else:
+        disc = p_in.discount_value or 0
+    total = sub_total + total_gst - disc
+
+    p.client_id = p_in.client_id
+    p.proforma_number = p_in.proforma_number
+    p.sub_total = sub_total
+    p.total_gst = total_gst
+    p.total_amount = total
+    p.paid_amount = p_in.paid_amount or 0
+    p.discount_value = p_in.discount_value or 0
+    p.discount_type = p_in.discount_type
+    p.is_gst = p_in.is_gst
+    p.payment_mode = p_in.payment_mode
+    p.payment_terms = p_in.payment_terms
+    p.delivery_details = p_in.delivery_details
+    p.notes = p_in.notes
+    p.items = items
+
+    await p.save()
+    return {"id": str(p.id), "proforma_number": p.proforma_number, "total_amount": p.total_amount, "status": p.status}
 
 @app.post("/proformas/{proforma_id}/convert")
 async def convert_proforma_to_invoice(
@@ -1385,7 +1492,7 @@ async def convert_proforma_to_invoice(
     p = await ProformaInvoice.get(proforma_id)
     if not p:
         raise HTTPException(status_code=404, detail="Proforma not found")
-    if user.role != UserRole.SUPER_ADMIN and p.user_id != str(user.id):
+    if user.role != UserRole.SUPER_ADMIN and p.user_id not in await get_org_user_ids(user):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     invoice_number = body.get("invoice_number", f"INV-{p.proforma_number}")
@@ -1521,7 +1628,7 @@ async def create_stock_adjustment(
     product = await Product.get(adj_in.product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    if user.role != UserRole.SUPER_ADMIN and product.user_id != str(user.id):
+    if user.role != UserRole.SUPER_ADMIN and product.user_id not in await get_org_user_ids(user):
         raise HTTPException(status_code=403, detail="Not authorized")
     
     if adj_in.adjustment_type == "add":
@@ -1545,7 +1652,8 @@ async def get_stock_adjustments(user: User = Depends(get_current_user)):
     if user.role == UserRole.SUPER_ADMIN:
         adjs = await StockAdjustment.find_all().to_list()
     else:
-        adjs = await StockAdjustment.find(StockAdjustment.user_id == str(user.id)).to_list()
+        org_ids = await get_org_user_ids(user)
+        adjs = await StockAdjustment.find(In(StockAdjustment.user_id, org_ids)).to_list()
     adjs.sort(key=lambda x: x.created_at, reverse=True)
     
     if not adjs:
@@ -1606,7 +1714,8 @@ async def get_payments(user: User = Depends(get_current_user)):
     if user.role == UserRole.SUPER_ADMIN:
         payments = await PaymentRecord.find_all().to_list()
     else:
-        payments = await PaymentRecord.find(PaymentRecord.user_id == str(user.id)).to_list()
+        org_ids = await get_org_user_ids(user)
+        payments = await PaymentRecord.find(In(PaymentRecord.user_id, org_ids)).to_list()
     payments.sort(key=lambda x: x.created_at, reverse=True)
     
     if not payments:
@@ -1643,9 +1752,10 @@ async def get_reports_summary(user: User = Depends(get_current_user)):
         clients = await Client.find_all().to_list()
         products = await Product.find_all().to_list()
     else:
-        invoices = await Invoice.find(Invoice.user_id == uid).to_list()
-        clients = await Client.find(Client.user_id == uid).to_list()
-        products = await Product.find(Product.user_id == uid).to_list()
+        org_ids = await get_org_user_ids(user)
+        invoices = await Invoice.find(In(Invoice.user_id, org_ids)).to_list()
+        clients = await Client.find(In(Client.user_id, org_ids)).to_list()
+        products = await Product.find(In(Product.user_id, org_ids)).to_list()
     
     invoices = [i for i in invoices if not getattr(i, 'is_deleted', False)]
     
@@ -1653,7 +1763,8 @@ async def get_reports_summary(user: User = Depends(get_current_user)):
     if user.role == UserRole.SUPER_ADMIN:
         payments = await PaymentRecord.find_all().to_list()
     else:
-        payments = await PaymentRecord.find(PaymentRecord.user_id == uid).to_list()
+        org_ids = await get_org_user_ids(user)
+        payments = await PaymentRecord.find(In(PaymentRecord.user_id, org_ids)).to_list()
 
     # Total collected = payments on invoices + general payments (unlinked)
     # Since invoice.paid_amount is updated when a linked payment is created,
@@ -1699,13 +1810,6 @@ async def get_reports_summary(user: User = Depends(get_current_user)):
     }
 
 # --- DASHBOARD ---
-async def get_all_descendants(user_id: str) -> List[str]:
-    descendants = []
-    children = await User.find(User.created_by_id == user_id).to_list()
-    for child in children:
-        descendants.append(str(child.id))
-        descendants.extend(await get_all_descendants(str(child.id)))
-    return descendants
 
 @app.get("/dashboard/stats")
 async def get_stats(

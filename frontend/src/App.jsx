@@ -75,7 +75,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
   const location = useLocation();
 
   return (
-    <div className="app-container" style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
+    <div className="app-container" style={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div 
@@ -210,7 +210,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
       </aside>
 
       {/* Main Area */}
-      <main className="main-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <main className="main-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', overflow: 'hidden' }}>
         {/* Top Header */}
         <header className="top-header" style={{
           backgroundColor: '#ffffff',
@@ -317,7 +317,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
         </header>
 
         {/* Content Wrapper */}
-        <div className="content-wrapper" style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+        <div className="content-wrapper" style={{ flex: 1, height: 0, overflowY: 'auto', backgroundColor: '#f8fafc' }}>
           {children}
         </div>
       </main>

@@ -18,8 +18,16 @@ class UserOut(BaseModel):
     trial_start_date: Optional[datetime] = None
     trial_end_date: Optional[datetime] = None
     created_at: datetime
+    last_login_at: Optional[datetime] = None
+    last_login_device: Optional[str] = None
+    last_login_ip: Optional[str] = None
+    last_activity_at: Optional[datetime] = None
     class Config:
         from_attributes = True
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 class Token(BaseModel):
     access_token: str

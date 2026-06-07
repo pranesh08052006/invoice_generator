@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
   PlusCircle, Users, Package, FileText, 
   Settings, LogOut, Home, LayoutDashboard,
   ShieldCheck, UserPlus, Menu, X, Bell, Search,
-  ClipboardList, FileCheck, BarChart3
+  ClipboardList, FileCheck, BarChart3, AlertTriangle
 } from 'lucide-react';
 import axios from 'axios';
 import API_BASE_URL from './config';
@@ -338,6 +338,7 @@ const App = () => {
   const [token, setToken] = useState(() => localStorage.getItem('token') || null);
   const [company, setCompany] = useState(null);
   const [logoVersion, setLogoVersion] = useState(Date.now());
+  const [sessionExpiredMsg, setSessionExpiredMsg] = useState('');
 
   const fetchMe = async () => {
     if (!token) return;
@@ -383,20 +384,41 @@ const App = () => {
   const login = (userData, token) => {
     setUser(userData);
     setToken(token);
+    setSessionExpiredMsg('');
     localStorage.setItem('user', JSON.stringify(userData));
     localStorage.setItem('token', token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     fetchCompany();
   };
 
-  const logout = () => {
+  const logout = useCallback(async (showSessionMsg = false) => {
+    const currentToken = localStorage.getItem('token');
+    
+    // Clear all local auth state synchronously first to prevent any loops
     setUser(null);
     setToken(null);
     setCompany(null);
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
-  };
+    
+    if (showSessionMsg) {
+      setSessionExpiredMsg('Your account has been logged in from another device. Please login again.');
+    }
+    
+    // Only call backend logout if we have a token and it was a manual logout (token not already invalid)
+    if (currentToken && !showSessionMsg) {
+      try {
+        await axios.post(`${API_BASE_URL}/auth/logout`, null, {
+          headers: {
+            Authorization: `Bearer ${currentToken}`
+          }
+        });
+      } catch (_) {
+        // Ignore errors as we are already cleared locally
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (token) {
@@ -408,17 +430,40 @@ const App = () => {
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          logout();
-          window.location.href = '/login';
+          const detail = error.response?.data?.detail || '';
+          const message = error.response?.data?.message || '';
+          if (detail === 'Session expired. Please login again.' || message === 'Session expired. Please login again.') {
+            // Another device logged in — show the notification toast
+            logout(true);
+          } else {
+            // Generic 401 (expired/invalid token, deleted user, etc.)
+            logout(false);
+          }
         }
         if (error.response?.status === 402) {
-          alert(error.response.data.detail || "Access restricted. Please contact your manager.");
+          alert(error.response.data.detail || 'Access restricted. Please contact your manager.');
         }
         return Promise.reject(error);
       }
     );
     return () => axios.interceptors.response.eject(interceptor);
-  }, [token]);
+  }, [token, logout]);
+
+  // Periodically check session validity for standard users every 5 seconds to trigger real-time logout
+  useEffect(() => {
+    if (!token || user?.role !== 'user') return;
+
+    const interval = setInterval(async () => {
+      try {
+        await axios.get(`${API_BASE_URL}/auth/me`);
+      } catch (err) {
+        // Axios interceptor will handle the 401 Session Expired response automatically
+        console.warn("Session check failed", err);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [token, user?.role]);
 
   const isLoggedIn = !!token && !!user;
 
@@ -427,7 +472,13 @@ const App = () => {
       <ScrollToTop />
       {!isLoggedIn ? (
         <Routes>
-          <Route path="/login" element={<Login login={login} />} />
+          <Route path="/login" element={
+            <Login
+              login={login}
+              sessionExpiredMsg={sessionExpiredMsg}
+              onDismissSessionMsg={() => setSessionExpiredMsg('')}
+            />
+          } />
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
       ) : (

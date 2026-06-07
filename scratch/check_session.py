@@ -10,10 +10,13 @@ async def main():
     client = AsyncIOMotorClient(DATABASE_URL)
     await init_beanie(database=client[DATABASE_NAME], document_models=[User])
     
-    users = await User.find_all().to_list()
-    print(f"Total users: {len(users)}")
-    for u in users:
-        print(f"ID: {u.id}, Email: {u.email}, Role: {u.role}, Created By: {u.created_by_id}")
+    u = await User.find_one(User.email == "user1@system.com")
+    if u:
+        print(f"Email: {u.email}")
+        print(f"Role: {u.role}")
+        print(f"Current Session ID: {u.current_session_id}")
+    else:
+        print("User user1@system.com not found!")
     client.close()
 
 if __name__ == "__main__":

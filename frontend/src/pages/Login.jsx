@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, AlertTriangle, X } from 'lucide-react';
 import logo from '../assets/logo.png';
 import API_BASE_URL from '../config';
 
-const Login = ({ login }) => {
+const Login = ({ login, sessionExpiredMsg, onDismissSessionMsg }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -55,6 +55,29 @@ const Login = ({ login }) => {
         display: 'flex',
         flexDirection: 'column'
       }}>
+        {/* ── Session-Expired Banner ── */}
+        {sessionExpiredMsg && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '10px',
+            padding: '14px 18px',
+            backgroundColor: '#fffbeb',
+            borderBottom: '1px solid #fcd34d',
+            animation: 'fadeIn 0.3s ease'
+          }}>
+            <AlertTriangle size={18} color="#d97706" style={{ flexShrink: 0, marginTop: '1px' }} />
+            <p style={{ flex: 1, margin: 0, fontSize: '13px', color: '#92400e', lineHeight: '1.5', fontWeight: '500' }}>
+              {sessionExpiredMsg}
+            </p>
+            <button
+              onClick={onDismissSessionMsg}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 4px', color: '#a16207', flexShrink: 0 }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
         {/* Main Content Area */}
         <div style={{ padding: '40px 40px 32px 40px' }}>
           {/* Brand & Logo */}

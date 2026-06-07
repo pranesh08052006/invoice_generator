@@ -38,13 +38,16 @@ class User(Document):
     created_by_id: Optional[str] = None
     last_login_device_id: Optional[str] = None
     last_login_ip: Optional[str] = None
+    # Single-active-session fields
+    current_session_id: Optional[str] = None   # UUID embedded in the JWT; only this session is valid
+    last_login_at: Optional[datetime] = None    # Timestamp of the most recent successful login
+    last_login_device: Optional[str] = None    # Parsed browser/device name
+    last_activity_at: Optional[datetime] = None  # Timestamp of the user's last active request
     # User Trial/Access fields
     has_full_access: bool = False
     trial_start_date: Optional[datetime] = None
     trial_end_date: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
-
-
 
     class Settings:
         name = "users"

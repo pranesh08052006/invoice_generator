@@ -4,6 +4,7 @@ from beanie import init_beanie
 import sys
 sys.path.append("/home/gowthaman/Documents/invoice_generator/backend")
 from models import User
+from auth import get_password_hash
 from database import DATABASE_URL, DATABASE_NAME
 
 async def main():
@@ -11,9 +12,19 @@ async def main():
     await init_beanie(database=client[DATABASE_NAME], document_models=[User])
     
     users = await User.find_all().to_list()
-    print(f"Total users: {len(users)}")
     for u in users:
-        print(f"ID: {u.id}, Email: {u.email}, Role: {u.role}, Created By: {u.created_by_id}")
+        new_password = ""
+        if "sadmin" in u.email:
+            new_password = "sadmin@123"
+        elif "admin" in u.email:
+            new_password = "admin@123"
+        else:
+            new_password = "user@123"
+            
+        u.hashed_password = get_password_hash(new_password)
+        await u.save()
+        print(f"Updated {u.email} password to: {new_password}")
+        
     client.close()
 
 if __name__ == "__main__":

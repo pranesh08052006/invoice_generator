@@ -38,10 +38,69 @@ const SettingsPage = ({ user, fetchCompanyGlobal }) => {
   const [logoCacheBuster, setLogoCacheBuster] = useState(Date.now());
   const [sigCacheBuster, setSigCacheBuster] = useState(Date.now());
 
+  // Security and session states
+  const [userDetails, setUserDetails] = useState(null);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
   useEffect(() => {
     fetchCompany();
     fetchSubscription();
+    fetchUserDetails();
   }, []);
+
+  const fetchUserDetails = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_BASE_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUserDetails(response.data);
+    } catch (err) {
+      console.error("Error fetching user details:", err);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters long.');
+      return;
+    }
+    setPasswordLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_BASE_URL}/auth/change-password`, {
+        current_password: currentPassword,
+        new_password: newPassword
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPasswordSuccess('Password updated successfully. Logging out...');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.reload();
+      }, 2000);
+    } catch (err) {
+      setPasswordError(err.response?.data?.detail || 'Failed to change password. Please check your current password.');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
 
   const fetchSubscription = async () => {
     try {
@@ -435,6 +494,126 @@ const SettingsPage = ({ user, fetchCompanyGlobal }) => {
                 SYNCING MEDIA ASSETS...
               </p>
             )}
+          </div>
+
+          {/* Current Active Session Card (Only for User role) */}
+          {userDetails?.role === 'user' && (
+            <div style={{ 
+              backgroundColor: 'var(--secondary-color)', 
+              border: '1px solid #eaedf3', 
+              borderRadius: '12px', 
+              padding: '32px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.01)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px'
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#111827', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
+                <ShieldCheck size={18} style={{ color: 'var(--primary-color)' }} />
+                Current Active Session
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f8fafc', paddingBottom: '8px' }}>
+                  <span style={{ color: '#4b5563', fontWeight: '500' }}>Device & Browser</span>
+                  <span style={{ color: '#111827', fontWeight: '600' }}>{userDetails.last_login_device || 'Unknown Device'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f8fafc', paddingBottom: '8px' }}>
+                  <span style={{ color: '#4b5563', fontWeight: '500' }}>IP Address</span>
+                  <span style={{ color: '#111827', fontWeight: '600', fontFamily: 'monospace' }}>{userDetails.last_login_ip || 'Unknown IP'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f8fafc', paddingBottom: '8px' }}>
+                  <span style={{ color: '#4b5563', fontWeight: '500' }}>Login Time</span>
+                  <span style={{ color: '#111827', fontWeight: '600' }}>
+                    {userDetails.last_login_at ? new Date(userDetails.last_login_at).toLocaleString() : 'N/A'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#4b5563', fontWeight: '500' }}>Last Activity</span>
+                  <span style={{ color: '#111827', fontWeight: '600' }}>
+                    {userDetails.last_activity_at ? new Date(userDetails.last_activity_at).toLocaleString() : 'Just now'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Security Settings (Change Password) Card */}
+          <div style={{ 
+            backgroundColor: 'var(--secondary-color)', 
+            border: '1px solid #eaedf3', 
+            borderRadius: '12px', 
+            padding: '32px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.01)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px'
+          }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#111827', borderBottom: '1px solid #f1f5f9', paddingBottom: '16px' }}>
+              <ShieldCheck size={18} style={{ color: 'var(--primary-color)' }} />
+              Security Settings (Change Password)
+            </h3>
+            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Current Password</label>
+                <input 
+                  type="password" 
+                  required
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', fontWeight: '500' }}
+                  placeholder="••••••••"
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>New Password</label>
+                <input 
+                  type="password" 
+                  required
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', fontWeight: '500' }}
+                  placeholder="••••••••"
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Confirm New Password</label>
+                <input 
+                  type="password" 
+                  required
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  style={{ height: '42px', padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', color: '#111827', fontWeight: '500' }}
+                  placeholder="••••••••"
+                />
+              </div>
+              {passwordError && (
+                <div style={{ color: '#ef4444', fontSize: '13px', fontWeight: '600' }}>
+                  {passwordError}
+                </div>
+              )}
+              {passwordSuccess && (
+                <div style={{ color: '#10b981', fontSize: '13px', fontWeight: '600' }}>
+                  {passwordSuccess}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={passwordLoading}
+                style={{
+                  height: '42px',
+                  backgroundColor: passwordLoading ? 'var(--primary-light)' : 'var(--primary-color)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: passwordLoading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {passwordLoading ? 'Updating Password...' : 'Update Password'}
+              </button>
+            </form>
           </div>
         </div>
 

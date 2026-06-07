@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Response
+from fastapi import FastAPI, Depends, HTTPException, status, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from typing import List, Optional
 from datetime import datetime, timedelta
 import io
+from uuid import uuid4
 from bson import ObjectId
 from beanie.operators import In
 
@@ -17,11 +18,12 @@ from models import (
 from schemas import (
     UserCreate, UserOut, ClientCreate, ClientOut, ProductCreate, ProductOut,
     InvoiceCreate, CompanyCreate, CompanyOut,
-    QuotationCreate, ProformaCreate, PaymentRecordCreate, StockAdjustmentCreate
+    QuotationCreate, ProformaCreate, PaymentRecordCreate, StockAdjustmentCreate,
+    ChangePasswordRequest
 )
 from auth import (
     get_password_hash, verify_password, create_access_token, 
-    get_current_user, check_role
+    get_current_user, check_role, SessionExpiredException
 )
 from pdf_gen import generate_invoice_pdf
 from contextlib import asynccontextmanager
@@ -47,7 +49,61 @@ async def lifespan(app: FastAPI):
         await super_admin.insert()
     yield
 
+from fastapi.responses import JSONResponse
+
 app = FastAPI(title="Pro Invoice SaaS", lifespan=lifespan)
+
+@app.exception_handler(SessionExpiredException)
+async def session_expired_exception_handler(request: Request, exc: SessionExpiredException):
+    return JSONResponse(
+        status_code=401,
+        content={
+            "message": "Session expired. Please login again.",
+            "detail": "Session expired. Please login again."
+        },
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+def parse_user_agent(ua: str) -> str:
+    if not ua:
+        return "Unknown Device"
+    ua_lower = ua.lower()
+    browser = "Unknown Browser"
+    device = "Unknown Device"
+    
+    # Extract browser
+    if "chrome" in ua_lower or "chromium" in ua_lower:
+        browser = "Chrome"
+    elif "safari" in ua_lower:
+        browser = "Safari"
+    elif "firefox" in ua_lower:
+        browser = "Firefox"
+    elif "edge" in ua_lower:
+        browser = "Edge"
+    elif "opera" in ua_lower or "opr" in ua_lower:
+        browser = "Opera"
+    elif "dart" in ua_lower:
+        browser = "Dart/Flutter Client"
+    
+    # Extract OS/Device
+    if "android" in ua_lower:
+        device = "Android"
+    elif "iphone" in ua_lower or "ipad" in ua_lower:
+        device = "iOS"
+    elif "windows" in ua_lower:
+        device = "Windows"
+    elif "macintosh" in ua_lower or "mac os" in ua_lower:
+        device = "Macintosh"
+    elif "linux" in ua_lower:
+        device = "Linux"
+        
+    if browser != "Unknown Browser" and device != "Unknown Device":
+        return f"{browser} on {device}"
+    elif browser != "Unknown Browser":
+        return browser
+    elif device != "Unknown Device":
+        return device
+    return ua[:50]
 
 app.add_middleware(
     CORSMiddleware,
@@ -85,6 +141,9 @@ async def get_all_descendants(user_id: str) -> List[str]:
 async def get_org_user_ids(user: User) -> List[str]:
     if user.role == UserRole.SUPER_ADMIN:
         return []
+    if user.role == UserRole.USER:
+        # Standard users should only have access to their own data
+        return [str(user.id)]
     ancestors = await get_ancestors(user)
     top_admin_id = ancestors[-1]
     descendants = await get_all_descendants(top_admin_id)
@@ -197,21 +256,48 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
-    # Device Login Restriction (Simple IP Tracking)
-    if user.role != UserRole.SUPER_ADMIN:
-        client_ip = request.client.host
-        # If we wanted to be strict: 
-        # if user.last_login_ip and user.last_login_ip != client_ip:
-        #    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Login restricted to your primary device.")
-        user.last_login_ip = client_ip
-        await user.save()
-    
-    access_token = create_access_token(data={"sub": user.email})
-    # Ensure user has a string ID in the response
+    # Generate a fresh unique session ID — this immediately invalidates any
+    # previously issued token for this account on any other device/browser.
+    session_id = str(uuid4())
+
+    # Capture login metadata
+    client_ip = request.client.host
+    user.current_session_id = session_id
+    user.last_login_at = datetime.utcnow()
+    user.last_login_ip = client_ip
+    user.last_login_device = parse_user_agent(request.headers.get("User-Agent", ""))
+    await user.save()
+
+    # Embed session_id inside the JWT as the 'sid' claim
+    access_token = create_access_token(data={"sub": user.email}, session_id=session_id)
+
     user_data = user.dict()
     user_data["id"] = str(user.id)
-    # Ensure trial/access fields are included (pydantic will handle serialization of datetime)
     return {"access_token": access_token, "token_type": "bearer", "user": user_data}
+
+
+@app.post("/auth/logout")
+async def logout(current_user: User = Depends(get_current_user)):
+    """
+    Invalidates the current session by clearing current_session_id in the DB.
+    Any JWT that previously belonged to this session will be rejected on the
+    next request, even if it hasn't expired yet.
+    """
+    current_user.current_session_id = None
+    await current_user.save()
+    return {"message": "Logged out successfully"}
+
+
+@app.post("/auth/change-password")
+async def change_password(data: ChangePasswordRequest, current_user: User = Depends(get_current_user)):
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+    
+    current_user.hashed_password = get_password_hash(data.new_password)
+    # Invalidate all active sessions (force login again) by generating a new session ID
+    current_user.current_session_id = str(uuid4())
+    await current_user.save()
+    return {"message": "Password changed successfully. Please log in again."}
 
 
 @app.get("/auth/me", response_model=UserOut)

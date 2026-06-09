@@ -64,11 +64,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
 
     # --- Single-active-session enforcement ---
-    # Enforced for USER role only; ADMIN and SUPER_ADMIN are exempt.
-    if user.role == UserRole.USER:
-        if token_session_id is not None:
-            if user.current_session_id != token_session_id:
-                raise SessionExpiredException()
+    # Enforced for all user roles (Super Admin, Admin, and User) to prevent concurrent logins.
+    if token_session_id is not None:
+        if user.current_session_id != token_session_id:
+            raise SessionExpiredException()
 
     # Track last activity (limit DB writes by updating at most once per 60 seconds)
     now = datetime.utcnow()

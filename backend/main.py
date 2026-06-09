@@ -12,14 +12,18 @@ from database import init_db
 from models import (
     User, UserRole, Client, Product, Invoice, InvoiceItem, InvoiceStatus, Company,
     Quotation, QuotationStatus, ProformaInvoice, ProformaStatus,
-    PaymentRecord, StockAdjustment, Subscription, PlanType
+    PaymentRecord, StockAdjustment, Subscription, PlanType,
+    ExpenseCategory, PaymentMode, Expense
 )
 
 from schemas import (
     UserCreate, UserOut, ClientCreate, ClientOut, ProductCreate, ProductOut,
     InvoiceCreate, CompanyCreate, CompanyOut,
     QuotationCreate, ProformaCreate, PaymentRecordCreate, StockAdjustmentCreate,
-    ChangePasswordRequest
+    ChangePasswordRequest,
+    ExpenseCategoryCreate, ExpenseCategoryOut,
+    PaymentModeCreate, PaymentModeOut,
+    ExpenseCreate, ExpenseOut
 )
 from auth import (
     get_password_hash, verify_password, create_access_token, 
@@ -1831,11 +1835,13 @@ async def get_reports_summary(user: User = Depends(get_current_user)):
         invoices = []
         clients = []
         products = []
+        expenses = []
     else:
         org_ids = await get_org_user_ids(user)
         invoices = await Invoice.find(In(Invoice.user_id, org_ids)).to_list()
         clients = await Client.find(In(Client.user_id, org_ids)).to_list()
         products = await Product.find(In(Product.user_id, org_ids)).to_list()
+        expenses = await Expense.find(In(Expense.user_id, org_ids)).to_list()
     
     invoices = [i for i in invoices if not getattr(i, 'is_deleted', False)]
     
@@ -1845,7 +1851,6 @@ async def get_reports_summary(user: User = Depends(get_current_user)):
     else:
         org_ids = await get_org_user_ids(user)
         payments = await PaymentRecord.find(In(PaymentRecord.user_id, org_ids)).to_list()
-
 
     # Total collected = payments on invoices + general payments (unlinked)
     # Since invoice.paid_amount is updated when a linked payment is created,
@@ -1877,6 +1882,18 @@ async def get_reports_summary(user: User = Depends(get_current_user)):
     # Low stock products
     low_stock = [{"id": str(p.id), "name": p.name, "stock": p.stock, "unit": p.unit} for p in products if p.stock <= 10]
     
+    # Expense aggregations
+    total_expenses = sum(exp.amount for exp in expenses)
+    cat_map = {}
+    for exp in expenses:
+        cat_map[exp.category] = cat_map.get(exp.category, 0.0) + exp.amount
+    category_expenses = [{"category": k, "amount": v} for k, v in cat_map.items()]
+    
+    pm_map = {}
+    for exp in expenses:
+        pm_map[exp.payment_mode] = pm_map.get(exp.payment_mode, 0.0) + exp.amount
+    payment_mode_expenses = [{"payment_mode": k, "amount": v} for k, v in pm_map.items()]
+    
     return {
         "total_revenue": total_revenue,
         "total_outstanding": total_outstanding,
@@ -1887,7 +1904,10 @@ async def get_reports_summary(user: User = Depends(get_current_user)):
         "paid_count": len([i for i in invoices if i.status == InvoiceStatus.PAID]),
         "unpaid_count": len([i for i in invoices if i.status != InvoiceStatus.PAID and i.status != InvoiceStatus.DRAFT]),
         "client_breakdown": list(client_stats.values()),
-        "low_stock_products": low_stock
+        "low_stock_products": low_stock,
+        "total_expenses": total_expenses,
+        "category_expenses": category_expenses,
+        "payment_mode_expenses": payment_mode_expenses
     }
 
 # --- DASHBOARD ---
@@ -1994,13 +2014,195 @@ async def get_stats(
     user_payments = await PaymentRecord.find(PaymentRecord.user_id == str(user.id)).to_list()
     unlinked_pmts = sum(p.amount for p in user_payments if not p.invoice_id)
     
+    # Calculate expense stats
+    user_expenses = await Expense.find(Expense.user_id == str(user.id)).to_list()
+    total_expenses = sum(exp.amount for exp in user_expenses)
+    
+    now = datetime.utcnow()
+    start_of_today = datetime(now.year, now.month, now.day)
+    start_of_month = datetime(now.year, now.month, 1)
+    
+    today_expenses = sum(exp.amount for exp in user_expenses if exp.date.replace(tzinfo=None) >= start_of_today)
+    month_expenses = sum(exp.amount for exp in user_expenses if exp.date.replace(tzinfo=None) >= start_of_month)
+    
     return {
         "total_sales": sum((inv.paid_amount or 0) for inv in user_invoices) + unlinked_pmts,
         "total_clients": clients_count,
         "total_products": len(await Product.find(Product.user_id == str(user.id)).to_list()),
         "total_invoices": len(user_invoices),
-        "recent_invoices": recent_invoices
+        "recent_invoices": recent_invoices,
+        "total_expenses": total_expenses,
+        "today_expenses": today_expenses,
+        "month_expenses": month_expenses
     }
+
+# --- Expense Categories endpoints ---
+
+@app.get("/expense-categories", response_model=List[ExpenseCategoryOut])
+async def get_expense_categories(user: User = Depends(get_current_user)):
+    categories = await ExpenseCategory.find(ExpenseCategory.user_id == str(user.id)).to_list()
+    if not categories:
+        # Seed defaults
+        defaults = ["Coffee", "Tea", "Dinner", "Travel", "Petrol", "Electricity", "Office Supplies"]
+        for d in defaults:
+            cat = ExpenseCategory(user_id=str(user.id), name=d)
+            await cat.insert()
+        categories = await ExpenseCategory.find(ExpenseCategory.user_id == str(user.id)).to_list()
+    return [{"id": str(c.id), "name": c.name} for c in categories]
+
+@app.post("/expense-categories", response_model=ExpenseCategoryOut)
+async def create_expense_category(payload: ExpenseCategoryCreate, user: User = Depends(get_current_user)):
+    existing = await ExpenseCategory.find_one(
+        ExpenseCategory.user_id == str(user.id),
+        ExpenseCategory.name == payload.name
+    )
+    if existing:
+        return {"id": str(existing.id), "name": existing.name}
+    cat = ExpenseCategory(user_id=str(user.id), name=payload.name)
+    await cat.insert()
+    return {"id": str(cat.id), "name": cat.name}
+
+@app.delete("/expense-categories/{category_id}")
+async def delete_expense_category(category_id: str, user: User = Depends(get_current_user)):
+    cat = await ExpenseCategory.get(category_id)
+    if not cat or cat.user_id != str(user.id):
+        raise HTTPException(status_code=404, detail="Category not found")
+    await cat.delete()
+    return {"message": "Category deleted successfully"}
+
+
+# --- Payment Modes endpoints ---
+
+@app.get("/payment-modes", response_model=List[PaymentModeOut])
+async def get_payment_modes(user: User = Depends(get_current_user)):
+    modes = await PaymentMode.find(PaymentMode.user_id == str(user.id)).to_list()
+    if not modes:
+        # Seed defaults
+        defaults = ["Cash", "UPI", "Bank Transfer", "Card"]
+        for d in defaults:
+            mode = PaymentMode(user_id=str(user.id), name=d)
+            await mode.insert()
+        modes = await PaymentMode.find(PaymentMode.user_id == str(user.id)).to_list()
+    return [{"id": str(m.id), "name": m.name} for m in modes]
+
+@app.post("/payment-modes", response_model=PaymentModeOut)
+async def create_payment_mode(payload: PaymentModeCreate, user: User = Depends(get_current_user)):
+    existing = await PaymentMode.find_one(
+        PaymentMode.user_id == str(user.id),
+        PaymentMode.name == payload.name
+    )
+    if existing:
+        return {"id": str(existing.id), "name": existing.name}
+    mode = PaymentMode(user_id=str(user.id), name=payload.name)
+    await mode.insert()
+    return {"id": str(mode.id), "name": mode.name}
+
+@app.delete("/payment-modes/{mode_id}")
+async def delete_payment_mode(mode_id: str, user: User = Depends(get_current_user)):
+    mode = await PaymentMode.get(mode_id)
+    if not mode or mode.user_id != str(user.id):
+        raise HTTPException(status_code=404, detail="Payment mode not found")
+    await mode.delete()
+    return {"message": "Payment mode deleted successfully"}
+
+
+# --- Expenses endpoints ---
+
+@app.get("/expenses", response_model=List[ExpenseOut])
+async def get_expenses(
+    category: Optional[str] = None,
+    payment_mode: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    user: User = Depends(get_current_user)
+):
+    query = {"user_id": str(user.id)}
+    
+    if category:
+        query["category"] = category
+    if payment_mode:
+        query["payment_mode"] = payment_mode
+        
+    # Build date filters
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            try:
+                date_filter["$gte"] = datetime.fromisoformat(start_date)
+            except ValueError:
+                pass
+        if end_date:
+            try:
+                date_filter["$lte"] = datetime.fromisoformat(end_date)
+            except ValueError:
+                pass
+        if date_filter:
+            query["date"] = date_filter
+            
+    expenses = await Expense.find(query).sort(-Expense.date).to_list()
+    return [
+        {
+            "id": str(e.id),
+            "category": e.category,
+            "amount": e.amount,
+            "payment_mode": e.payment_mode,
+            "date": e.date,
+            "notes": e.notes,
+            "created_at": e.created_at
+        } for e in expenses
+    ]
+
+@app.post("/expenses", response_model=ExpenseOut)
+async def create_expense(payload: ExpenseCreate, user: User = Depends(get_current_user)):
+    expense = Expense(
+        user_id=str(user.id),
+        category=payload.category,
+        amount=payload.amount,
+        payment_mode=payload.payment_mode,
+        date=payload.date,
+        notes=payload.notes
+    )
+    await expense.insert()
+    return {
+        "id": str(expense.id),
+        "category": expense.category,
+        "amount": expense.amount,
+        "payment_mode": expense.payment_mode,
+        "date": expense.date,
+        "notes": expense.notes,
+        "created_at": expense.created_at
+    }
+
+@app.put("/expenses/{expense_id}", response_model=ExpenseOut)
+async def update_expense(expense_id: str, payload: ExpenseCreate, user: User = Depends(get_current_user)):
+    expense = await Expense.get(expense_id)
+    if not expense or expense.user_id != str(user.id):
+        raise HTTPException(status_code=404, detail="Expense not found")
+    
+    expense.category = payload.category
+    expense.amount = payload.amount
+    expense.payment_mode = payload.payment_mode
+    expense.date = payload.date
+    expense.notes = payload.notes
+    
+    await expense.save()
+    return {
+        "id": str(expense.id),
+        "category": expense.category,
+        "amount": expense.amount,
+        "payment_mode": expense.payment_mode,
+        "date": expense.date,
+        "notes": expense.notes,
+        "created_at": expense.created_at
+    }
+
+@app.delete("/expenses/{expense_id}")
+async def delete_expense(expense_id: str, user: User = Depends(get_current_user)):
+    expense = await Expense.get(expense_id)
+    if not expense or expense.user_id != str(user.id):
+        raise HTTPException(status_code=404, detail="Expense not found")
+    await expense.delete()
+    return {"message": "Expense deleted successfully"}
 
 if __name__ == "__main__":
     import uvicorn

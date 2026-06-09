@@ -199,3 +199,40 @@ class StockAdjustmentCreate(BaseModel):
     adjustment_type: str = "add"
     quantity: int
     reason: Optional[str] = None
+
+# --- Expense Schemas ---
+class ExpenseCategoryCreate(BaseModel):
+    name: str
+
+class ExpenseCategoryOut(BaseModel):
+    id: str
+    name: str
+    class Config:
+        from_attributes = True
+
+class PaymentModeCreate(BaseModel):
+    name: str
+
+class PaymentModeOut(BaseModel):
+    id: str
+    name: str
+    class Config:
+        from_attributes = True
+
+class ExpenseCreate(BaseModel):
+    category: str
+    amount: float
+    payment_mode: str
+    date: datetime = Field(default_factory=datetime.utcnow)
+    notes: Optional[str] = None
+
+class ExpenseOut(BaseModel):
+    id: str
+    category: str
+    amount: float
+    payment_mode: str
+    date: datetime
+    notes: Optional[str] = None
+    created_at: datetime
+    class Config:
+        from_attributes = True

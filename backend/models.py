@@ -246,3 +246,34 @@ class StockAdjustment(Document):
 
     class Settings:
         name = "stock_adjustments"
+
+# --- Expense Category Model ---
+class ExpenseCategory(Document):
+    user_id: Indexed(str)
+    name: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "expense_categories"
+
+# --- Payment Mode Model ---
+class PaymentMode(Document):
+    user_id: Indexed(str)
+    name: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "payment_modes"
+
+# --- Expense Model ---
+class Expense(Document):
+    user_id: Indexed(str)
+    category: str
+    amount: float
+    payment_mode: str
+    date: datetime = Field(default_factory=datetime.utcnow)
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "expenses"

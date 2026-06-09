@@ -36,13 +36,25 @@ const Reports = ({ user, company }) => {
       filename = "sales_report.csv";
       csvContent += "Client,Invoiced Amount,Paid Amount,Invoices Count\n";
       reportData.client_breakdown.forEach(c => {
-        csvContent += `${c.name},${c.invoiced},${c.paid},${c.count}\n`;
+        csvContent += `"${c.name}",${c.invoiced},${c.paid},${c.count}\n`;
       });
     } else if (type === 'inventory') {
       filename = "low_inventory_report.csv";
       csvContent += "Product ID,Product Name,Stock Level,Unit\n";
       reportData.low_stock_products.forEach(p => {
-        csvContent += `${p.id},${p.name},${p.stock},${p.unit}\n`;
+        csvContent += `"${p.id}","${p.name}",${p.stock},"${p.unit}"\n`;
+      });
+    } else if (type === 'category_expenses') {
+      filename = "expense_category_report.csv";
+      csvContent += "Category,Amount\n";
+      (reportData.category_expenses || []).forEach(c => {
+        csvContent += `"${c.category}",${c.amount}\n`;
+      });
+    } else if (type === 'payment_mode_expenses') {
+      filename = "expense_payment_mode_report.csv";
+      csvContent += "Payment Mode,Amount\n";
+      (reportData.payment_mode_expenses || []).forEach(pm => {
+        csvContent += `"${pm.payment_mode}",${pm.amount}\n`;
       });
     }
 
@@ -58,7 +70,11 @@ const Reports = ({ user, company }) => {
   const downloadPDF = (type) => {
     if (!reportData) return;
     const printWindow = window.open('', '_blank');
-    const label = type === 'sales' ? 'Client Sales Breakdown' : 'Low Stock Alert';
+    let label = '';
+    if (type === 'sales') label = 'Client Sales Breakdown';
+    else if (type === 'inventory') label = 'Low Stock Alert';
+    else if (type === 'category_expenses') label = 'Expense Category Breakdown';
+    else if (type === 'payment_mode_expenses') label = 'Expense Payment Mode Breakdown';
     
     const html = `
       <html>
@@ -97,10 +113,16 @@ const Reports = ({ user, company }) => {
                   <th class="text-right">Invoiced Amount</th>
                   <th class="text-right">Paid Amount</th>
                   <th class="text-right">Balance</th>
-                ` : `
+                ` : type === 'inventory' ? `
                   <th>Product Name</th>
                   <th>Product ID</th>
                   <th class="text-right">Current Stock</th>
+                ` : type === 'category_expenses' ? `
+                  <th>Category</th>
+                  <th class="text-right">Amount</th>
+                ` : `
+                  <th>Payment Mode</th>
+                  <th class="text-right">Amount</th>
                 `}
               </tr>
             </thead>
@@ -112,24 +134,36 @@ const Reports = ({ user, company }) => {
                   <td class="text-right">₹${(c.paid || 0).toLocaleString()}</td>
                   <td class="text-right">₹${((c.invoiced || 0) - (c.paid || 0)).toLocaleString()}</td>
                 </tr>
-              `).join('') : reportData.low_stock_products.map(p => `
+              `).join('') : type === 'inventory' ? reportData.low_stock_products.map(p => `
                 <tr>
                   <td><strong>${p.name}</strong></td>
                   <td>${p.id}</td>
                   <td class="text-right" style="color: ${p.stock <= 5 ? '#ef4444' : '#f59e0b'}">${p.stock} ${p.unit}</td>
                 </tr>
+              `).join('') : type === 'category_expenses' ? (reportData.category_expenses || []).map(c => `
+                <tr>
+                  <td><strong>${c.category}</strong></td>
+                  <td class="text-right">₹${(c.amount || 0).toLocaleString()}</td>
+                </tr>
+              `).join('') : (reportData.payment_mode_expenses || []).map(pm => `
+                <tr>
+                  <td><strong>${pm.payment_mode}</strong></td>
+                  <td class="text-right">₹${(pm.amount || 0).toLocaleString()}</td>
+                </tr>
               `).join('')}
             </tbody>
-            ${type === 'sales' ? `
-              <tfoot>
-                <tr class="total-row">
-                  <td>TOTAL</td>
-                  <td class="text-right">₹${reportData.total_invoiced.toLocaleString()}</td>
+            <tfoot>
+              <tr class="total-row">
+                <td>TOTAL</td>
+                <td class="text-right">
+                  ₹${(type === 'sales' ? reportData.total_revenue : (type === 'inventory' ? '' : reportData.total_expenses || 0)).toLocaleString()}
+                </td>
+                ${type === 'sales' ? `
                   <td class="text-right">₹${reportData.total_revenue.toLocaleString()}</td>
                   <td class="text-right">₹${reportData.total_outstanding.toLocaleString()}</td>
-                </tr>
-              </tfoot>
-            ` : ''}
+                ` : ''}
+              </tr>
+            </tfoot>
           </table>
           <script>
             window.onload = function() { window.print(); setTimeout(function() { window.close(); }, 500); };
@@ -171,8 +205,8 @@ const Reports = ({ user, company }) => {
         </div>
       </div>
 
-      {/* Grid row of 4 Premium Metrics cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', marginBottom: '32px' }}>
+      {/* Grid row of Premium Metrics cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '24px', marginBottom: '32px' }}>
         <div style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid #eaedf3', borderRadius: '12px', position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
           <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Total Revenue
@@ -218,6 +252,18 @@ const Reports = ({ user, company }) => {
           </div>
           <div style={{ position: 'absolute', right: '24px', top: '24px', width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <CreditCard size={18} style={{ color: '#8b5cf6' }} />
+          </div>
+        </div>
+
+        <div style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid #eaedf3', borderRadius: '12px', position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
+          <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Total Expenses
+          </span>
+          <div style={{ fontSize: '28px', fontWeight: '800', marginTop: '8px', color: '#f43f5e' }}>
+            ₹{(reportData.total_expenses || 0).toLocaleString()}
+          </div>
+          <div style={{ position: 'absolute', right: '24px', top: '24px', width: '36px', height: '36px', borderRadius: '8px', backgroundColor: '#fff1f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CreditCard size={18} style={{ color: '#f43f5e' }} />
           </div>
         </div>
       </div>
@@ -314,6 +360,103 @@ const Reports = ({ user, company }) => {
                 {reportData.low_stock_products.length === 0 && (
                   <tr>
                     <td colSpan="2" style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>All inventory items are sufficiently stocked.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Expense Breakdown Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '32px' }}>
+        {/* Expense Category Breakdown */}
+        <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaedf3', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid #eaedf3', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fafafa' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CreditCard size={18} style={{ color: 'var(--primary-color)' }} />
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#111827', margin: 0 }}>Category-wise Expenses</h2>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                onClick={() => downloadPDF('category_expenses')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
+              >
+                <FileText size={14} /> Export PDF
+              </button>
+              <button 
+                onClick={() => downloadCSV('category_expenses')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
+              >
+                <Download size={14} /> Export CSV
+              </button>
+            </div>
+          </div>
+          <div style={{ padding: '0', overflowX: 'auto', maxHeight: '400px', overflowY: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 1 }}>
+                <tr>
+                  <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#6b7280', borderBottom: '1px solid #eaedf3' }}>Category</th>
+                  <th style={{ padding: '12px 24px', textAlign: 'right', fontSize: '12px', fontWeight: '700', color: '#6b7280', borderBottom: '1px solid #eaedf3' }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(reportData.category_expenses || []).map((c, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #eaedf3' }}>
+                    <td style={{ padding: '12px 24px', fontSize: '14px', fontWeight: '600', color: '#111827' }}>{c.category}</td>
+                    <td style={{ padding: '12px 24px', fontSize: '14px', fontWeight: '700', color: '#374151', textAlign: 'right' }}>₹{(c.amount || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+                {(!reportData.category_expenses || reportData.category_expenses.length === 0) && (
+                  <tr>
+                    <td colSpan="2" style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>No category expense data available.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Expense Payment Mode Breakdown */}
+        <div style={{ backgroundColor: '#ffffff', border: '1px solid #eaedf3', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
+          <div style={{ padding: '20px 24px', borderBottom: '1px solid #eaedf3', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fafafa' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CreditCard size={18} style={{ color: '#10b981' }} />
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#111827', margin: 0 }}>Payment Mode-wise Expenses</h2>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                onClick={() => downloadPDF('payment_mode_expenses')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
+              >
+                <FileText size={14} /> Export PDF
+              </button>
+              <button 
+                onClick={() => downloadCSV('payment_mode_expenses')}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '600', color: '#475569', cursor: 'pointer' }}
+              >
+                <Download size={14} /> Export CSV
+              </button>
+            </div>
+          </div>
+          <div style={{ padding: '0', overflowX: 'auto', maxHeight: '400px', overflowY: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc', zIndex: 1 }}>
+                <tr>
+                  <th style={{ padding: '12px 24px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: '#6b7280', borderBottom: '1px solid #eaedf3' }}>Payment Mode</th>
+                  <th style={{ padding: '12px 24px', textAlign: 'right', fontSize: '12px', fontWeight: '700', color: '#6b7280', borderBottom: '1px solid #eaedf3' }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(reportData.payment_mode_expenses || []).map((pm, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #eaedf3' }}>
+                    <td style={{ padding: '12px 24px', fontSize: '14px', fontWeight: '600', color: '#111827' }}>{pm.payment_mode}</td>
+                    <td style={{ padding: '12px 24px', fontSize: '14px', fontWeight: '700', color: '#374151', textAlign: 'right' }}>₹{(pm.amount || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+                {(!reportData.payment_mode_expenses || reportData.payment_mode_expenses.length === 0) && (
+                  <tr>
+                    <td colSpan="2" style={{ padding: '24px', textAlign: 'center', color: '#6b7280', fontSize: '14px' }}>No payment mode expense data available.</td>
                   </tr>
                 )}
               </tbody>

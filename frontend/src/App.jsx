@@ -4,10 +4,12 @@ import {
   PlusCircle, Users, Package, FileText, 
   Settings, LogOut, Home, LayoutDashboard,
   ShieldCheck, UserPlus, Menu, X, Bell, Search,
-  ClipboardList, FileCheck, BarChart3, AlertTriangle
+  ClipboardList, FileCheck, BarChart3, AlertTriangle,
+  CreditCard
 } from 'lucide-react';
 import axios from 'axios';
 import API_BASE_URL from './config';
+
 
 // Set global axios defaults on load to prevent refresh race conditions
 const initialToken = localStorage.getItem('token');
@@ -28,6 +30,7 @@ import AdminUsers from './pages/AdminUsers';
 import Quotations from './pages/Quotations';
 import Proformas from './pages/Proformas';
 import Reports from './pages/Reports';
+import Expenses from './pages/Expenses';
 
 import logo from './assets/logo.png';
 
@@ -140,6 +143,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
               <SidebarLink to="/invoices" label="Transactions" icon={FileText} />
               <SidebarLink to="/quotations" label="Quotations" icon={ClipboardList} />
               <SidebarLink to="/proformas" label="Proforma" icon={FileCheck} />
+              <SidebarLink to="/expenses" label="Expenses" icon={CreditCard} />
               <SidebarLink to="/reports" label="Reports" icon={BarChart3} />
             </>
           )}
@@ -449,9 +453,9 @@ const App = () => {
     return () => axios.interceptors.response.eject(interceptor);
   }, [token, logout]);
 
-  // Periodically check session validity for standard users every 5 seconds to trigger real-time logout
+  // Periodically check session validity for all users every 5 seconds to trigger real-time logout
   useEffect(() => {
-    if (!token || user?.role !== 'user') return;
+    if (!token) return;
 
     const interval = setInterval(async () => {
       try {
@@ -463,7 +467,7 @@ const App = () => {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [token, user?.role]);
+  }, [token]);
 
   const isLoggedIn = !!token && !!user;
 
@@ -496,6 +500,7 @@ const App = () => {
             <Route path="/proformas" element={user?.role === 'user' ? <Proformas user={user} /> : <Navigate to="/" />} />
             <Route path="/proformas/new" element={user?.role === 'user' ? <CreateInvoice key="create-proforma" user={user} type="proforma" /> : <Navigate to="/" />} />
             <Route path="/reports" element={user?.role === 'user' ? <Reports user={user} company={company} /> : <Navigate to="/" />} />
+            <Route path="/expenses" element={user?.role === 'user' ? <Expenses user={user} /> : <Navigate to="/" />} />
             
             <Route path="/settings" element={<SettingsPage user={user} fetchCompanyGlobal={fetchCompany} />} />
             

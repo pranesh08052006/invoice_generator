@@ -1,6 +1,0 @@
-﻿ID: 6a16b43602824afecc79913d, User: Regular User, Email: user@system.com, Role: UserRole.USER
-ID: 6a16b4dc08b712e92050ecf3, User: Employee, Email: employee@system.com, Role: UserRole.USER
-ID: 6a16b61eaf1d4181e5553591, User: Super Admin, Email: admin@system.com, Role: UserRole.SUPER_ADMIN
-ID: 6a17fb775a28fa53a4d72e51, User: Manager, Email: admin01@system.com, Role: UserRole.ADMIN
-ID: 6a17fba05a28fa53a4d72e52, User: user, Email: user01@system.com, Role: UserRole.USER
-ID: 6a180305e4e8d17774f1fcc3, User: user, Email: user02@system.com, Role: UserRole.USER

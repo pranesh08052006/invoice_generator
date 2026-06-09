@@ -451,6 +451,9 @@ const Dashboard = ({ user }) => {
             <StatsCard title="Total Invoices" value={`${stats?.total_invoices || 0}`} icon={FileText} subtext={`${totalPaidInvoices || 0} paid invoices`} />
             <StatsCard title="Pending Amount" value={`₹${pendingAmount?.toLocaleString() || 0}`} icon={CreditCard} subtext={`${totalUnpaidInvoices || 0} unpaid invoices`} trendColor="error" />
             <StatsCard title="Active Customers" value={`${stats?.total_clients || 0}`} icon={Users} subtext="Recently active" />
+            <StatsCard title="Total Expenses" value={`₹${stats?.total_expenses?.toLocaleString() || 0}`} icon={CreditCard} subtext="All recorded expenses" trendColor="error" />
+            <StatsCard title="Today's Expenses" value={`₹${stats?.today_expenses?.toLocaleString() || 0}`} icon={Calendar} subtext="Spent today" />
+            <StatsCard title="This Month's Expenses" value={`₹${stats?.month_expenses?.toLocaleString() || 0}`} icon={Calendar} subtext="Spent this month" />
           </>
         )}
       </div>

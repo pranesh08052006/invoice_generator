@@ -128,6 +128,8 @@ async def get_ancestors(user: User) -> List[str]:
     while current.created_by_id:
         parent = await User.get(current.created_by_id)
         if not parent: break
+        if parent.role == UserRole.SUPER_ADMIN:
+            break
         ids.append(str(parent.id))
         current = parent
     return ids

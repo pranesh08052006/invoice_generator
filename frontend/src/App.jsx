@@ -131,7 +131,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
         <nav className="sidebar-nav" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', padding: '16px 0' }}>
           <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} />
           
-          {/* User-only: New Invoice shortcut + operational pages */}
+          {/* Operational pages for standard billing users */}
           {user?.role === 'user' && (
             <>
               <SidebarLink to="/invoices/new" label="New Invoice" icon={PlusCircle} />
@@ -153,7 +153,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
           )}
           <SidebarLink to="/settings" label="Settings" icon={Settings} />
 
-          {/* Floating New Invoice Button (User Only) */}
+          {/* Floating New Invoice Button (User only) */}
           {user?.role === 'user' && (
             <div style={{ padding: '20px 16px 10px 16px' }}>
               <button 
@@ -485,17 +485,22 @@ const App = () => {
         <AppLayout user={user} logout={logout} company={company} logoVersion={logoVersion}>
           <Routes>
             <Route path="/" element={<Dashboard user={user} />} />
-            <Route path="/clients" element={<Clients user={user} company={company} />} />
-            <Route path="/products" element={<Products user={user} />} />
-            <Route path="/invoices" element={<Invoices user={user} />} />
-            <Route path="/invoices/new" element={<CreateInvoice key="create-invoice" user={user} type="invoice" />} />
-            <Route path="/quotations" element={<Quotations user={user} />} />
-            <Route path="/quotations/new" element={<CreateInvoice key="create-quotation" user={user} type="quotation" />} />
-            <Route path="/proformas" element={<Proformas user={user} />} />
-            <Route path="/proformas/new" element={<CreateInvoice key="create-proforma" user={user} type="proforma" />} />
-            <Route path="/reports" element={<Reports user={user} company={company} />} />
+            
+            {/* Operational routes guarded for standard users only */}
+            <Route path="/clients" element={user?.role === 'user' ? <Clients user={user} company={company} /> : <Navigate to="/" />} />
+            <Route path="/products" element={user?.role === 'user' ? <Products user={user} /> : <Navigate to="/" />} />
+            <Route path="/invoices" element={user?.role === 'user' ? <Invoices user={user} /> : <Navigate to="/" />} />
+            <Route path="/invoices/new" element={user?.role === 'user' ? <CreateInvoice key="create-invoice" user={user} type="invoice" /> : <Navigate to="/" />} />
+            <Route path="/quotations" element={user?.role === 'user' ? <Quotations user={user} /> : <Navigate to="/" />} />
+            <Route path="/quotations/new" element={user?.role === 'user' ? <CreateInvoice key="create-quotation" user={user} type="quotation" /> : <Navigate to="/" />} />
+            <Route path="/proformas" element={user?.role === 'user' ? <Proformas user={user} /> : <Navigate to="/" />} />
+            <Route path="/proformas/new" element={user?.role === 'user' ? <CreateInvoice key="create-proforma" user={user} type="proforma" /> : <Navigate to="/" />} />
+            <Route path="/reports" element={user?.role === 'user' ? <Reports user={user} company={company} /> : <Navigate to="/" />} />
+            
             <Route path="/settings" element={<SettingsPage user={user} fetchCompanyGlobal={fetchCompany} />} />
-            <Route path="/admin/users" element={<AdminUsers user={user} />} />
+            
+            {/* Admin management routes guarded for admins and super admins only */}
+            <Route path="/admin/users" element={user?.role === 'super_admin' || user?.role === 'admin' ? <AdminUsers user={user} /> : <Navigate to="/" />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </AppLayout>

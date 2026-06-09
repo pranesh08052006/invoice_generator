@@ -552,7 +552,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
       <div className="invoice-layout-grid">
         
         {/* Left Column Workspace */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', minWidth: 0 }}>
           
           {/* Card: Invoice Parameters */}
           <div className="card" style={{ padding: '32px', backgroundColor: '#ffffff', border: '1px solid #eaedf3', borderRadius: '12px' }}>
@@ -561,7 +561,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
               <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#111827', margin: 0 }}>{type === 'invoice' ? 'Invoice' : type === 'quotation' ? 'Quotation' : 'Proforma'} Parameters</h3>
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', marginBottom: '24px' }}>
+            <div className="responsive-grid-2-1" style={{ display: 'grid', gap: '24px', marginBottom: '24px' }}>
               {/* Customer Picker */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Customer</label>
@@ -672,7 +672,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            <div className="responsive-grid-1-1" style={{ display: 'grid', gap: '24px' }}>
               {/* Issue Date */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Issue Date</label>
@@ -1147,7 +1147,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
               <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#111827', margin: 0 }}>Payment Context</h3>
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+            <div className="responsive-grid-1-1" style={{ display: 'grid', gap: '24px', marginBottom: '24px' }}>
               {/* Payment Method select */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Payment Method</label>
@@ -1257,7 +1257,7 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
               <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#111827', margin: 0 }}>Additional Details</h3>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+            <div className="responsive-grid-1-1" style={{ display: 'grid', gap: '24px', marginBottom: '24px' }}>
               {/* Payment Terms Input */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Payment Terms</label>

@@ -139,15 +139,9 @@ async def get_all_descendants(user_id: str) -> List[str]:
 
 # Helper to get all organization user IDs (top admin + descendants)
 async def get_org_user_ids(user: User) -> List[str]:
-    if user.role == UserRole.SUPER_ADMIN:
-        return []
-    if user.role == UserRole.USER:
-        # Standard users should only have access to their own data
-        return [str(user.id)]
-    ancestors = await get_ancestors(user)
-    top_admin_id = ancestors[-1]
-    descendants = await get_all_descendants(top_admin_id)
-    return [top_admin_id] + descendants
+    # Strict data privacy: every user (including admin roles) only has access to their own data.
+    return [str(user.id)]
+
 
 async def check_subscription(user: User):
     # Super Admin is exempt
@@ -624,10 +618,10 @@ async def create_client(
 @app.get("/clients", response_model=List[ClientOut])
 async def get_clients(user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))):
     if user.role == UserRole.SUPER_ADMIN:
-        clients = await Client.find_all().to_list()
-    else:
-        org_ids = await get_org_user_ids(user)
-        clients = await Client.find(In(Client.user_id, org_ids)).to_list()
+        return []
+    org_ids = await get_org_user_ids(user)
+    clients = await Client.find(In(Client.user_id, org_ids)).to_list()
+
     
     return [
         {
@@ -698,10 +692,10 @@ async def create_product(
 @app.get("/products", response_model=List[ProductOut])
 async def get_products(user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.USER]))):
     if user.role == UserRole.SUPER_ADMIN:
-        products = await Product.find_all().to_list()
-    else:
-        org_ids = await get_org_user_ids(user)
-        products = await Product.find(In(Product.user_id, org_ids)).to_list()
+        return []
+    org_ids = await get_org_user_ids(user)
+    products = await Product.find(In(Product.user_id, org_ids)).to_list()
+
     return [
         {
             "id": str(p.id),
@@ -881,10 +875,10 @@ async def update_invoice_status(
 async def get_invoices(user: User = Depends(get_current_user)):
     try:
         if user.role == UserRole.SUPER_ADMIN:
-            invoices = await Invoice.find_all().to_list()
-        else:
-            org_ids = await get_org_user_ids(user)
-            invoices = await Invoice.find(In(Invoice.user_id, org_ids)).to_list()
+            return []
+        org_ids = await get_org_user_ids(user)
+        invoices = await Invoice.find(In(Invoice.user_id, org_ids)).to_list()
+
         
         # Filter out soft-deleted invoices and sort newest first
         invoices = [inv for inv in invoices if not getattr(inv, 'is_deleted', False)]
@@ -1224,10 +1218,10 @@ async def create_quotation(
 async def get_quotations(user: User = Depends(get_current_user)):
     try:
         if user.role == UserRole.SUPER_ADMIN:
-            quotations = await Quotation.find_all().to_list()
-        else:
-            org_ids = await get_org_user_ids(user)
-            quotations = await Quotation.find(In(Quotation.user_id, org_ids)).to_list()
+            return []
+        org_ids = await get_org_user_ids(user)
+        quotations = await Quotation.find(In(Quotation.user_id, org_ids)).to_list()
+
         quotations = [q for q in quotations if not getattr(q, 'is_deleted', False)]
         quotations.sort(key=lambda x: x.created_at, reverse=True)
 
@@ -1474,10 +1468,10 @@ async def create_proforma(
 async def get_proformas(user: User = Depends(get_current_user)):
     try:
         if user.role == UserRole.SUPER_ADMIN:
-            proformas = await ProformaInvoice.find_all().to_list()
-        else:
-            org_ids = await get_org_user_ids(user)
-            proformas = await ProformaInvoice.find(In(ProformaInvoice.user_id, org_ids)).to_list()
+            return []
+        org_ids = await get_org_user_ids(user)
+        proformas = await ProformaInvoice.find(In(ProformaInvoice.user_id, org_ids)).to_list()
+
         proformas = [p for p in proformas if not getattr(p, 'is_deleted', False)]
         proformas.sort(key=lambda x: x.created_at, reverse=True)
 
@@ -1736,10 +1730,10 @@ async def create_stock_adjustment(
 @app.get("/stock-adjustments")
 async def get_stock_adjustments(user: User = Depends(get_current_user)):
     if user.role == UserRole.SUPER_ADMIN:
-        adjs = await StockAdjustment.find_all().to_list()
-    else:
-        org_ids = await get_org_user_ids(user)
-        adjs = await StockAdjustment.find(In(StockAdjustment.user_id, org_ids)).to_list()
+        return []
+    org_ids = await get_org_user_ids(user)
+    adjs = await StockAdjustment.find(In(StockAdjustment.user_id, org_ids)).to_list()
+
     adjs.sort(key=lambda x: x.created_at, reverse=True)
     
     if not adjs:
@@ -1798,10 +1792,10 @@ async def create_payment(
 @app.get("/payments")
 async def get_payments(user: User = Depends(get_current_user)):
     if user.role == UserRole.SUPER_ADMIN:
-        payments = await PaymentRecord.find_all().to_list()
-    else:
-        org_ids = await get_org_user_ids(user)
-        payments = await PaymentRecord.find(In(PaymentRecord.user_id, org_ids)).to_list()
+        return []
+    org_ids = await get_org_user_ids(user)
+    payments = await PaymentRecord.find(In(PaymentRecord.user_id, org_ids)).to_list()
+
     payments.sort(key=lambda x: x.created_at, reverse=True)
     
     if not payments:
@@ -1834,9 +1828,9 @@ async def get_reports_summary(user: User = Depends(get_current_user)):
     """Get comprehensive report data."""
     uid = str(user.id)
     if user.role == UserRole.SUPER_ADMIN:
-        invoices = await Invoice.find_all().to_list()
-        clients = await Client.find_all().to_list()
-        products = await Product.find_all().to_list()
+        invoices = []
+        clients = []
+        products = []
     else:
         org_ids = await get_org_user_ids(user)
         invoices = await Invoice.find(In(Invoice.user_id, org_ids)).to_list()
@@ -1847,10 +1841,11 @@ async def get_reports_summary(user: User = Depends(get_current_user)):
     
     # Fetch all payments to include general payments (unlinked to invoices)
     if user.role == UserRole.SUPER_ADMIN:
-        payments = await PaymentRecord.find_all().to_list()
+        payments = []
     else:
         org_ids = await get_org_user_ids(user)
         payments = await PaymentRecord.find(In(PaymentRecord.user_id, org_ids)).to_list()
+
 
     # Total collected = payments on invoices + general payments (unlinked)
     # Since invoice.paid_amount is updated when a linked payment is created,
@@ -1908,8 +1903,11 @@ async def get_stats(
         if not target: 
             raise HTTPException(status_code=404, detail="User not found")
         
-        # Security: Admins can only see their own subordinates
-        if user.role == UserRole.ADMIN:
+        # Security: Users can only see their own performance; Admins can only see their subordinates
+        if user.role == UserRole.USER:
+            if str(target.id) != str(user.id):
+                raise HTTPException(status_code=403, detail="Not authorized to view this user")
+        elif user.role == UserRole.ADMIN:
             if target.created_by_id != str(user.id) and str(target.id) != str(user.id):
                 raise HTTPException(status_code=403, detail="Not authorized to view this user")
         

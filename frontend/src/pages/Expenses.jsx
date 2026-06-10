@@ -365,7 +365,8 @@ const Expenses = ({ user }) => {
   );
 
   return (
-    <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+    <>
+      <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -710,15 +711,16 @@ const Expenses = ({ user }) => {
           </tbody>
         </table>
       </div>
-
+    </div>
+      
       {/* Add / Edit Expense Modal */}
       {showModal && (
         <div 
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             backgroundColor: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 9999, padding: '20px'
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+            zIndex: 9999, padding: '50px 20px 20px 20px', overflowY: 'auto'
           }}
           onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
         >
@@ -979,7 +981,7 @@ const Expenses = ({ user }) => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

@@ -77,6 +77,143 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Interactive top header states
+  const [activeDropdown, setActiveDropdown] = useState(null); // 'notifications' | 'profile' | null
+  
+  // Track read and deleted notifications IDs in localStorage to persist user actions
+  const [readNotificationIds, setReadNotificationIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('read_notifications');
+      return saved ? JSON.parse(saved) : [];
+    } catch (_) {
+      return [];
+    }
+  });
+
+  const [deletedNotificationIds, setDeletedNotificationIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('deleted_notifications');
+      return saved ? JSON.parse(saved) : [];
+    } catch (_) {
+      return [];
+    }
+  });
+
+  const [dynamicNotifications, setDynamicNotifications] = useState([]);
+
+  useEffect(() => {
+    localStorage.setItem('read_notifications', JSON.stringify(readNotificationIds));
+  }, [readNotificationIds]);
+
+  useEffect(() => {
+    localStorage.setItem('deleted_notifications', JSON.stringify(deletedNotificationIds));
+  }, [deletedNotificationIds]);
+
+  const staticNotifications = [
+    { id: 'welcome', title: 'Welcome to Digital Viyabari!', message: 'Explore your dashboard and set up company settings.', time: 'Just now', type: 'info' },
+    { id: 'backup', title: 'Database Backup Completed', message: 'Your business data was successfully backed up.', time: '1 hour ago', type: 'success' },
+    { id: 'update', title: 'System Update', message: 'New invoicing templates are now available.', time: '2 hours ago', type: 'system' }
+  ];
+
+  const fetchDynamicNotifications = useCallback(async () => {
+    if (user?.role !== 'user') return;
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      
+      const [productsRes, invoicesRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/products`),
+        axios.get(`${API_BASE_URL}/invoices`)
+      ]);
+      
+      const newDynamic = [];
+      
+      // Check for low stock (products with stock <= 5)
+      if (Array.isArray(productsRes.data)) {
+        productsRes.data.forEach(p => {
+          if (p.item_type === 'product' && p.stock <= 5) {
+            newDynamic.push({
+              id: `low-stock-${p.id}`,
+              title: 'Low Stock Warning',
+              message: `${p.name} is running low on stock (${p.stock} ${p.unit || 'Units'} left)`,
+              type: 'system',
+              time: 'Real-time'
+            });
+          }
+        });
+      }
+      
+      // Check for draft invoices (invoices with status === 'DRAFT')
+      if (Array.isArray(invoicesRes.data)) {
+        invoicesRes.data.forEach(inv => {
+          if (inv.status === 'DRAFT' && !inv.is_deleted) {
+            newDynamic.push({
+              id: `draft-invoice-${inv.id}`,
+              title: 'Pending Draft Invoice',
+              message: `Draft invoice ${inv.invoice_number} is pending. Total: ₹${inv.total_amount.toLocaleString()}`,
+              type: 'info',
+              time: 'Real-time'
+            });
+          }
+        });
+      }
+      
+      setDynamicNotifications(newDynamic);
+    } catch (err) {
+      console.warn("Failed to fetch notification sources", err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchDynamicNotifications();
+    if (user?.role === 'user') {
+      const interval = setInterval(fetchDynamicNotifications, 10000); // update every 10 seconds
+      return () => clearInterval(interval);
+    }
+  }, [fetchDynamicNotifications, user]);
+
+  const allNotifications = [
+    ...staticNotifications,
+    ...dynamicNotifications
+  ].filter(n => !deletedNotificationIds.includes(n.id));
+
+  const notificationsWithReadState = allNotifications.map(n => ({
+    ...n,
+    read: readNotificationIds.includes(n.id)
+  }));
+
+  const unreadNotificationsCount = notificationsWithReadState.filter(n => !n.read).length;
+
+  const markAllNotificationsAsRead = () => {
+    const allIds = allNotifications.map(n => n.id);
+    setReadNotificationIds(prev => {
+      const union = new Set([...prev, ...allIds]);
+      return Array.from(union);
+    });
+  };
+
+  const toggleNotificationRead = (id) => {
+    setReadNotificationIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const deleteNotification = (id, event) => {
+    event.stopPropagation(); // prevent triggering click/read toggle
+    setDeletedNotificationIds(prev => [...prev, id]);
+  };
+
+  // Close dropdowns on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.header-control-container')) {
+        setActiveDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
     <div className="app-container" style={{ display: 'flex', height: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
       {/* Mobile Menu Overlay */}
@@ -131,7 +268,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
         </div>
 
         {/* Sidebar Navigation */}
-        <nav className="sidebar-nav" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', padding: '16px 0' }}>
+        <nav className="sidebar-nav" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', padding: '16px 0', overflowY: 'auto' }}>
           <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} />
           
           {/* Operational pages for standard billing users */}
@@ -263,59 +400,152 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
           {/* Right Header Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
             {/* Bell Icon */}
-            <button style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '6px',
-              position: 'relative',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#4b5563'
-            }}>
-              <Bell size={20} />
-              <span style={{
-                position: 'absolute', top: '4px', right: '4px',
-                width: '6px', height: '6px',
-                backgroundColor: '#ef4444', borderRadius: '50%'
-              }} />
-            </button>
+            <div className="header-control-container">
+              <button 
+                onClick={() => setActiveDropdown(activeDropdown === 'notifications' ? null : 'notifications')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: activeDropdown === 'notifications' ? 'var(--primary-color)' : '#4b5563',
+                  transition: 'color 0.2s ease'
+                }}
+              >
+                <Bell size={20} />
+                {unreadNotificationsCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: '4px', right: '4px',
+                    width: '16px', height: '16px',
+                    backgroundColor: '#ef4444', borderRadius: '50%',
+                    color: '#ffffff', fontSize: '9px', fontWeight: '800',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
 
-            {/* Help Question-mark Icon */}
-            <button style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '6px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#4b5563'
-            }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-              </svg>
-            </button>
+              {activeDropdown === 'notifications' && (
+                <div className="header-dropdown" style={{ width: '340px' }}>
+                  <div className="dropdown-header">
+                    <span className="dropdown-title">Notifications</span>
+                    {unreadNotificationsCount > 0 && (
+                      <button onClick={markAllNotificationsAsRead} className="dropdown-action">
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+                  <div className="dropdown-body no-scrollbar">
+                    {notificationsWithReadState.length === 0 ? (
+                      <div style={{ padding: '24px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+                        No notifications
+                      </div>
+                    ) : (
+                      notificationsWithReadState.map(n => (
+                        <div 
+                          key={n.id} 
+                          className={`dropdown-item ${!n.read ? 'unread' : ''}`}
+                          onClick={() => toggleNotificationRead(n.id)}
+                          style={{ position: 'relative', paddingRight: '40px' }}
+                        >
+                          <div className={`notification-icon-container ${n.type}`}>
+                            {n.type === 'success' && <ShieldCheck size={16} />}
+                            {n.type === 'info' && <Bell size={16} />}
+                            {n.type === 'system' && <AlertTriangle size={16} />}
+                          </div>
+                          <div className="notification-content">
+                            <span className="notification-item-title">{n.title}</span>
+                            <span className="notification-message">{n.message}</span>
+                            <span className="notification-time">{n.time}</span>
+                          </div>
+                          
+                          {/* Close/Cancel X button */}
+                          <button
+                            onClick={(e) => deleteNotification(n.id, e)}
+                            style={{
+                              position: 'absolute',
+                              top: '12px',
+                              right: '12px',
+                              background: 'none',
+                              border: 'none',
+                              color: '#9ca3af',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '4px',
+                              borderRadius: '4px',
+                              transition: 'all 0.2s ease',
+                              zIndex: 10
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.backgroundColor = '#fee2e2'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = '#9ca3af'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Avatar with blue background */}
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              backgroundColor: '#0284c7',
-              color: '#ffffff',
-              fontWeight: '700',
-              fontSize: '13px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              border: '2px solid #e0f2fe'
-            }}>
-              {user?.full_name?.[0] || 'U'}
+            <div className="header-control-container">
+              <div 
+                onClick={() => setActiveDropdown(activeDropdown === 'profile' ? null : 'profile')}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  backgroundColor: '#0284c7',
+                  color: '#ffffff',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  border: activeDropdown === 'profile' ? '2px solid var(--primary-color)' : '2px solid #e0f2fe',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                {user?.full_name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || 'U'}
+              </div>
+
+              {activeDropdown === 'profile' && (
+                <div className="header-dropdown" style={{ width: '220px' }}>
+                  <div className="profile-dropdown-header">
+                    <span className="profile-dropdown-name">{user?.full_name || user?.username || 'User'}</span>
+                    <span className="profile-dropdown-role">
+                      {user?.role === 'super_admin' ? 'Super Admin' : user?.role === 'admin' ? 'Manager' : 'Billing Manager'}
+                    </span>
+                  </div>
+                  <div className="dropdown-body no-scrollbar">
+                    <button 
+                      onClick={() => { navigate('/settings'); setActiveDropdown(null); }}
+                      className="profile-dropdown-btn"
+                    >
+                      <Settings size={16} />
+                      <span>Settings</span>
+                    </button>
+                    <button 
+                      onClick={() => { logout(); setActiveDropdown(null); }}
+                      className="profile-dropdown-btn danger"
+                      style={{ borderTop: '1px solid var(--border-light)' }}
+                    >
+                      <LogOut size={16} />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>

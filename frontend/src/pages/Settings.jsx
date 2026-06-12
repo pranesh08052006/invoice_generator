@@ -891,25 +891,47 @@ const SettingsPage = ({ user, fetchCompanyGlobal }) => {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Upgrade or Renew via WhatsApp</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
                     {[
-                      { name: 'Basic', price: '₹4,999/yr', features: ['Unlimited Invoices', 'Stock Management'] },
-                      { name: 'Premium', price: '₹9,999/yr', features: ['WhatsApp Automation', 'Multi-user Access'] }
+                      { 
+                        name: 'Premium', 
+                        features: [
+                          'Unlimited Invoice Creation',
+                          'Unlimited Customer Creation',
+                          'Stock Management',
+                          'WhatsApp Automation',
+                          'Multi-user Access'
+                        ] 
+                      }
                     ].map(plan => (
                       <div 
                         key={plan.name}
                         onClick={() => {
-                          const msg = encodeURIComponent(`Hi, I would like to upgrade my Justry account to the ${plan.name} plan. My email is ${localStorage.getItem('userEmail') || 'registered email'}.`);
+                          const msg = encodeURIComponent(`Hi, I would like to upgrade my Justry account to the Premium plan. My email is ${localStorage.getItem('userEmail') || 'registered email'}.`);
                           window.open(`https://wa.me/919876543210?text=${msg}`, '_blank');
                         }}
-                        style={{ padding: '16px', border: '1px solid #e2e8f0', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.15s ease', backgroundColor: '#ffffff' }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary-color)'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none'; }}
+                        style={{ 
+                          padding: '24px', 
+                          border: '1px solid #e2e8f0', 
+                          borderRadius: '16px', 
+                          cursor: 'pointer', 
+                          transition: 'all 0.2s ease', 
+                          backgroundColor: '#ffffff',
+                          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary-color)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05)'; }}
                       >
-                        <div style={{ fontSize: '14px', fontWeight: '800', color: '#111827' }}>{plan.name}</div>
-                        <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', marginTop: '4px' }}>{plan.price}</div>
-                        <ul style={{ padding: 0, margin: '12px 0 0 0', listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          {plan.features.map(f => <li key={f} style={{ fontSize: '11px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle2 size={10} style={{ color: '#16a34a' }} /> {f}</li>)}
+                        <div style={{ fontSize: '18px', fontWeight: '800', color: '#111827', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)', padding: '4px 12px', borderRadius: '99px', fontSize: '12px', fontWeight: '800' }}>RECOMMENDED</span>
+                          {plan.name} Plan
+                        </div>
+                        <ul style={{ padding: 0, margin: '16px 0 0 0', listStyle: 'none', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          {plan.features.map(f => (
+                            <li key={f} style={{ fontSize: '13px', color: '#4b5563', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500' }}>
+                              <CheckCircle2 size={14} style={{ color: '#16a34a', flexShrink: 0 }} /> {f}
+                            </li>
+                          ))}
                         </ul>
                       </div>
                     ))}

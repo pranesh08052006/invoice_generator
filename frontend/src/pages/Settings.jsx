@@ -890,52 +890,43 @@ const SettingsPage = ({ user, fetchCompanyGlobal }) => {
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Upgrade or Renew via WhatsApp</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-                    {[
-                      { 
-                        name: 'Premium', 
-                        features: [
-                          'Unlimited Invoice Creation',
-                          'Unlimited Customer Creation',
-                          'Stock Management',
-                          'WhatsApp Automation',
-                          'Multi-user Access'
-                        ] 
-                      }
-                    ].map(plan => (
-                      <div 
-                        key={plan.name}
-                        onClick={() => {
-                          const msg = encodeURIComponent(`Hi, I would like to upgrade my Justry account to the Premium plan. My email is ${localStorage.getItem('userEmail') || 'registered email'}.`);
-                          window.open(`https://wa.me/919876543210?text=${msg}`, '_blank');
-                        }}
-                        style={{ 
-                          padding: '24px', 
-                          border: '1px solid #e2e8f0', 
-                          borderRadius: '16px', 
-                          cursor: 'pointer', 
-                          transition: 'all 0.2s ease', 
-                          backgroundColor: '#ffffff',
-                          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary-color)'; e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.05)'; }}
-                      >
-                        <div style={{ fontSize: '18px', fontWeight: '800', color: '#111827', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)', padding: '4px 12px', borderRadius: '99px', fontSize: '12px', fontWeight: '800' }}>RECOMMENDED</span>
-                          {plan.name} Plan
-                        </div>
-                        <ul style={{ padding: 0, margin: '16px 0 0 0', listStyle: 'none', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                          {plan.features.map(f => (
-                            <li key={f} style={{ fontSize: '13px', color: '#4b5563', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500' }}>
-                              <CheckCircle2 size={14} style={{ color: '#16a34a', flexShrink: 0 }} /> {f}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = encodeURIComponent(`Hi, I would like to upgrade my Justry account to the Premium plan. My email is ${localStorage.getItem('userEmail') || 'registered email'}.`);
+                      window.open(`https://wa.me/919876543210?text=${msg}`, '_blank');
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px',
+                      width: '100%',
+                      height: '46px',
+                      backgroundColor: '#25D366',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: '0 2px 4px rgba(37, 211, 102, 0.2)'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = '#20ba56';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 211, 102, 0.3)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = '#25D366';
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(37, 211, 102, 0.2)';
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.057 5.284 5.349 0 11.859 0c3.15 0 6.11 1.229 8.337 3.458a11.77 11.77 0 0 1 3.45 8.349c-.002 6.557-5.292 11.84-11.802 11.84h-.008c-2.003-.001-3.972-.516-5.712-1.498L0 24zm6.49-4.22c1.517.9 3.09 1.376 4.708 1.378h.007c5.449 0 9.882-4.414 9.884-9.837.001-2.627-1.02-5.097-2.876-6.953C16.357 2.512 13.9 1.492 11.282 1.492 5.832 1.492 1.399 5.905 1.397 11.33c-.001 1.725.453 3.41 1.32 4.887l-.99 3.61 3.693-.97c1.428.779 3.033 1.192 4.627 1.192zm8.73-6.425c-.246-.123-1.455-.717-1.68-.8-.225-.082-.389-.123-.553.123-.163.246-.635.8-.778.963-.143.163-.286.184-.532.06-2.023-1.002-3.322-2.316-4.062-3.597-.196-.34-.03-.523.14-.693.153-.153.34-.396.51-.594.17-.198.227-.33.342-.55.115-.22.057-.412-.028-.577-.086-.165-.778-1.875-1.066-2.572-.28-.675-.563-.585-.778-.596-.2-.01-.43-.012-.656-.012s-.594.084-.903.424c-.309.34-1.18 1.155-1.18 2.816 0 1.66 1.208 3.263 1.373 3.488.164.225 2.378 3.632 5.761 5.087 2.816 1.21 3.435.967 4.053.909.62-.058 1.982-.81 2.26-1.593.28-.783.28-1.456.196-1.594-.083-.138-.28-.22-.53-.343z"/>
+                    </svg>
+                    Upgrade or Renew via WhatsApp
+                  </button>
                 </div>
               </div>
             ) : (

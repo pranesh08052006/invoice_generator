@@ -156,7 +156,7 @@ const Quotations = ({ user }) => {
       </div>
 
       {/* Grid row of 3 Premium Metrics cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '24px', marginBottom: '24px' }}>
         <div style={{ padding: '24px', backgroundColor: '#ffffff', border: '1px solid #eaedf3', borderRadius: '12px', position: 'relative', boxShadow: '0 1px 3px rgba(0,0,0,0.01)' }}>
           <span style={{ fontSize: '12px', color: '#6b7280', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Total Quoted Volume

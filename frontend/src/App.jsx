@@ -34,10 +34,11 @@ import Expenses from './pages/Expenses';
 
 import logo from './assets/logo.png';
 
-const SidebarLink = ({ to, label, icon: Icon }) => (
+const SidebarLink = ({ to, label, icon: Icon, onClick }) => (
   <NavLink 
     to={to} 
     end
+    onClick={onClick}
     className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
     style={({ isActive }) => ({
       display: 'flex',
@@ -233,55 +234,75 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
         backgroundColor: 'var(--secondary-color)'
       }}>
         {/* Brand Block */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '24px 20px', borderBottom: '1px solid #fafafa' }}>
-          {company?.logo_url ? (
-            <img 
-              src={`${company.logo_url}?v=${logoVersion}`} 
-              alt="Company Logo" 
-              style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'contain' }} 
-            />
-          ) : (
-            <div style={{
-              width: '40px',
-              height: '40px',
-              backgroundColor: 'var(--primary-color)',
-              borderRadius: '8px',
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 20px', borderBottom: '1px solid #fafafa' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {company?.logo_url ? (
+              <img 
+                src={`${company.logo_url}?v=${logoVersion}`} 
+                alt="Company Logo" 
+                style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'contain' }} 
+              />
+            ) : (
+              <div style={{
+                width: '40px',
+                height: '40px',
+                backgroundColor: 'var(--primary-color)',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                fontWeight: '800',
+                fontSize: '18px',
+                letterSpacing: '-1px'
+              }}>
+                {company?.name ? company.name.substring(0, 2).toUpperCase() : 'DV'}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontWeight: '800', fontSize: '15px', color: '#09090b', letterSpacing: '-0.3px', lineHeight: '1.2' }}>
+                {company?.name || 'Digital Viyabari'}
+              </span>
+              <span style={{ fontSize: '10px', color: '#9ca3af', fontWeight: '700', letterSpacing: '0.05em' }}>
+                ENTERPRISE BILLING
+              </span>
+            </div>
+          </div>
+          
+          <button 
+            className="mobile-close-btn"
+            onClick={() => setIsMobileMenuOpen(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: '#9ca3af',
+              padding: '4px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#ffffff',
-              fontWeight: '800',
-              fontSize: '18px',
-              letterSpacing: '-1px'
-            }}>
-              {company?.name ? company.name.substring(0, 2).toUpperCase() : 'DV'}
-            </div>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontWeight: '800', fontSize: '15px', color: '#09090b', letterSpacing: '-0.3px', lineHeight: '1.2' }}>
-              {company?.name || 'Digital Viyabari'}
-            </span>
-            <span style={{ fontSize: '10px', color: '#9ca3af', fontWeight: '700', letterSpacing: '0.05em' }}>
-              ENTERPRISE BILLING
-            </span>
-          </div>
+              borderRadius: '6px'
+            }}
+          >
+            <X size={20} />
+          </button>
         </div>
 
         {/* Sidebar Navigation */}
         <nav className="sidebar-nav" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', padding: '16px 0', overflowY: 'auto' }}>
-          <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} />
+          <SidebarLink to="/" label="Dashboard" icon={LayoutDashboard} onClick={() => setIsMobileMenuOpen(false)} />
           
           {/* Operational pages for standard billing users */}
           {user?.role === 'user' && (
             <>
-              <SidebarLink to="/invoices/new" label="New Invoice" icon={PlusCircle} />
-              <SidebarLink to="/clients" label="Customers" icon={Users} />
-              <SidebarLink to="/products" label="Inventory" icon={Package} />
-              <SidebarLink to="/invoices" label="Transactions" icon={FileText} />
-              <SidebarLink to="/quotations" label="Quotations" icon={ClipboardList} />
-              <SidebarLink to="/proformas" label="Proforma" icon={FileCheck} />
-              <SidebarLink to="/expenses" label="Expenses" icon={CreditCard} />
-              <SidebarLink to="/reports" label="Reports" icon={BarChart3} />
+              <SidebarLink to="/invoices/new" label="New Invoice" icon={PlusCircle} onClick={() => setIsMobileMenuOpen(false)} />
+              <SidebarLink to="/clients" label="Customers" icon={Users} onClick={() => setIsMobileMenuOpen(false)} />
+              <SidebarLink to="/products" label="Inventory" icon={Package} onClick={() => setIsMobileMenuOpen(false)} />
+              <SidebarLink to="/invoices" label="Transactions" icon={FileText} onClick={() => setIsMobileMenuOpen(false)} />
+              <SidebarLink to="/quotations" label="Quotations" icon={ClipboardList} onClick={() => setIsMobileMenuOpen(false)} />
+              <SidebarLink to="/proformas" label="Proforma" icon={FileCheck} onClick={() => setIsMobileMenuOpen(false)} />
+              <SidebarLink to="/expenses" label="Expenses" icon={CreditCard} onClick={() => setIsMobileMenuOpen(false)} />
+              <SidebarLink to="/reports" label="Reports" icon={BarChart3} onClick={() => setIsMobileMenuOpen(false)} />
             </>
           )}
 
@@ -290,15 +311,15 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
 
           {/* Admin/Super Admin Management Section */}
           {(user?.role === 'super_admin' || user?.role === 'admin') && (
-            <SidebarLink to="/admin/users" label={user?.role === 'super_admin' ? "Managers" : "Users"} icon={UserPlus} />
+            <SidebarLink to="/admin/users" label={user?.role === 'super_admin' ? "Managers" : "Users"} icon={UserPlus} onClick={() => setIsMobileMenuOpen(false)} />
           )}
-          <SidebarLink to="/settings" label="Settings" icon={Settings} />
+          <SidebarLink to="/settings" label="Settings" icon={Settings} onClick={() => setIsMobileMenuOpen(false)} />
 
           {/* Floating New Invoice Button (User only) */}
           {user?.role === 'user' && (
             <div style={{ padding: '20px 16px 10px 16px' }}>
               <button 
-                onClick={() => navigate('/invoices/new')}
+                onClick={() => { navigate('/invoices/new'); setIsMobileMenuOpen(false); }}
                 style={{
                   width: '100%',
                   height: '42px',
@@ -326,10 +347,10 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
 
         {/* Bottom Sidebar Block */}
         <div style={{ borderTop: '1px solid #eaedf3', padding: '16px 0' }}>
-          <SidebarLink to="/settings" label="Support" icon={Home} />
+          <SidebarLink to="/settings" label="Support" icon={Home} onClick={() => setIsMobileMenuOpen(false)} />
           <a 
             href="#" 
-            onClick={(e) => { e.preventDefault(); logout(); }}
+            onClick={(e) => { e.preventDefault(); logout(); setIsMobileMenuOpen(false); }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -369,7 +390,7 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
           </button>
 
           {/* Search Bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, maxWidth: '400px' }}>
+          <div className="header-search-container" style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, maxWidth: '400px' }}>
             <div style={{ position: 'relative', width: '100%' }}>
               <Search size={18} style={{
                 position: 'absolute', left: '12px', top: '50%',

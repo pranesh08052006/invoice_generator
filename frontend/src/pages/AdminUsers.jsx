@@ -110,7 +110,7 @@ const AdminUsers = ({ user }) => {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '24px', marginBottom: '32px' }}>
         <div className="card" style={{ padding: '24px', borderLeft: '4px solid var(--primary-color)' }}>
           <Shield size={20} color="var(--primary-color)" style={{ marginBottom: '12px' }} />
           <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--primary-color)' }}>{users.filter(u => u.role === 'super_admin' || u.role === 'admin').length}</div>

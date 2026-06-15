@@ -152,3 +152,6 @@ error_log.txt
 replace_ips.py
 test_ssh.ps1
 image.png
+
+# Flutter app
+flutter_app/

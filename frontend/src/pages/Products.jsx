@@ -166,7 +166,7 @@ const Products = ({ user }) => {
       </div>
 
       {/* Grid Row of 4 Redesigned Metrics Blocks */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
         
         {/* Total SKUs */}
         <div 
@@ -679,7 +679,7 @@ const Products = ({ user }) => {
                 {/* Section 1: Basic info */}
                 <div>
                   <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '16px' }}>Basic Information</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '16px' }}>
+                  <div className="form-grid-3col">
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Item Name *</label>
                       <input 
@@ -785,7 +785,7 @@ const Products = ({ user }) => {
                 {/* Section 2: Codes & inventory */}
                 <div>
                   <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '16px' }}>Inventory</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-grid-2col">
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>HSN/SAC Code</label>
                       <input 
@@ -812,7 +812,7 @@ const Products = ({ user }) => {
                 {/* Section 3: Pricing and taxes */}
                 <div>
                   <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--primary-color)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '16px' }}>Pricing & Taxes</span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div className="form-grid-2col" style={{ marginBottom: '16px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Base Unit Price *</label>
                       <div style={{ display: 'flex', height: '42px' }}>
@@ -868,7 +868,7 @@ const Products = ({ user }) => {
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Discount (Optional)</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="form-grid-2col">
                       <div style={{ position: 'relative', height: '42px' }}>
                         <input 
                           type="number" 

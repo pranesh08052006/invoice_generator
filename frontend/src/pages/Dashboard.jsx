@@ -349,17 +349,14 @@ const Dashboard = ({ user }) => {
   return (
     <div className="animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
       {/* Welcome Hero Banner */}
-      <div style={{
+      <div className="welcome-hero" style={{
         borderRadius: '12px',
         padding: '32px 40px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         color: '#ffffff',
         boxShadow: '0 10px 25px -5px var(--primary-light)',
         backgroundImage: 'radial-gradient(circle at top right, rgba(255, 255, 255, 0.15), transparent), linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+        <div className="welcome-hero-left">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
               <h2 style={{ fontSize: '26px', fontWeight: '800', margin: 0, letterSpacing: '-0.02em' }}>
@@ -383,15 +380,9 @@ const Dashboard = ({ user }) => {
           </div>
 
           {user?.role === 'user' && (user?.has_full_access || daysLeft !== null) && (
-            <div style={{
+            <div className="status-badge-container" style={{
               backgroundColor: user?.has_full_access ? 'rgba(255, 255, 255, 0.15)' : (daysLeft >= 0 ? 'rgba(255, 255, 255, 0.15)' : 'rgba(239, 68, 68, 0.2)'),
-              padding: '10px 20px',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              border: `1px solid ${user?.has_full_access || daysLeft >= 0 ? 'rgba(255, 255, 255, 0.2)' : 'rgba(239, 68, 68, 0.3)'}`,
-              marginLeft: '20px'
+              border: `1px solid ${user?.has_full_access || daysLeft >= 0 ? 'rgba(255, 255, 255, 0.2)' : 'rgba(239, 68, 68, 0.3)'}`
             }}>
               {user?.has_full_access ? <ShieldCheck size={20} /> : <Calendar size={20} />}
               <div>
@@ -406,6 +397,7 @@ const Dashboard = ({ user }) => {
 
         {user?.role === 'user' && (
           <button 
+            className="btn-create-invoice"
             onClick={() => navigate('/invoices/new')}
             style={{
               backgroundColor: '#ffffff',
@@ -693,7 +685,7 @@ const Dashboard = ({ user }) => {
             </button>
           </div>
           
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px' }}>
+          <div className="performance-grid" style={{ marginBottom: '28px' }}>
             <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #eaedf3' }}>
               <p style={{ fontSize: '11px', color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Revenue</p>
               <p style={{ fontWeight: '800', fontSize: '22px', color: '#111827', marginTop: '6px', marginBottom: 0 }}>₹{(userStats.total_sales || 0).toLocaleString()}</p>

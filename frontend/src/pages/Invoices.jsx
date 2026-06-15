@@ -374,7 +374,7 @@ const Invoices = ({ user }) => {
       </div>
 
       {/* Grid row of 3 Premium Metrics cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '24px' }}>
         
         {/* Total Volume */}
         <div style={{ 

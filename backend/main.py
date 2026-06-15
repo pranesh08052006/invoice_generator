@@ -57,6 +57,10 @@ from fastapi.responses import JSONResponse
 
 app = FastAPI(title="Pro Invoice SaaS", lifespan=lifespan)
 
+@app.get("/health", include_in_schema=False)
+async def health_check():
+    return {"status": "ok"}
+
 @app.exception_handler(SessionExpiredException)
 async def session_expired_exception_handler(request: Request, exc: SessionExpiredException):
     return JSONResponse(

@@ -1,0 +1,65 @@
+version: '3.8'
+
+networks:
+  invoice_net:
+    driver: bridge
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    image: invoice_backend:prod
+    container_name: invoice_backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - DATABASE_URL=${MONGO_URL}
+      - DATABASE_NAME=${DATABASE_NAME}
+      - BASE_URL=${BASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+    volumes:
+      - uploads_data:/app/uploads
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - invoice_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        - VITE_API_URL=${BASE_URL}
+    image: invoice_frontend:prod
+    container_name: invoice_frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:80"
+    networks:
+      - invoice_net
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+volumes:
+  uploads_data:
+    driver: local

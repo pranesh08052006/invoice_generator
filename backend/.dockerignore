@@ -8,3 +8,7 @@ __pycache__/
 .env.production
 .git
 .github
+*.pdf
+test_*.py
+reset_db.py
+seed_data.py

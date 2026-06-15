@@ -94,8 +94,11 @@ try {
 } catch(e) { print('User exists: ' + e.message); }
 " 2>/dev/null
 
-    # Harden mongod.conf — bind localhost only + enable auth
-    cat > /etc/mongod.conf << 'MONGOCFG'
+    # Harden mongod.conf — bind localhost + docker bridge + enable auth
+    # Get docker bridge gateway (containers connect via this IP)
+    DOCKER_GW=$(docker network inspect bridge --format='{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo "172.17.0.1")
+
+    cat > /etc/mongod.conf << MONGOCFG
 storage:
   dbPath: /var/lib/mongodb
 systemLog:
@@ -104,7 +107,7 @@ systemLog:
   path: /var/log/mongodb/mongod.log
 net:
   port: 27017
-  bindIp: 127.0.0.1
+  bindIp: 127.0.0.1,${DOCKER_GW}
 processManagement:
   timeZoneInfo: /usr/share/zoneinfo
 security:
@@ -122,7 +125,7 @@ else
     fi
 fi
 
-MONGO_URL="mongodb://${DB_USER}:${DB_PASS}@127.0.0.1:27017/${DB_NAME}?authSource=${DB_NAME}"
+MONGO_URL="mongodb://${DB_USER}:${DB_PASS}@host.docker.internal:27017/${DB_NAME}?authSource=${DB_NAME}"
 
 # ──────────────────────────────────────────────────────────
 # STEP 5 — PROJECT RETRIEVAL

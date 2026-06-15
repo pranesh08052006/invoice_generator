@@ -152,7 +152,7 @@ log_info "=== STEP 6: ENVIRONMENT FILE ==="
 
 cat > "${APP_DIR}/.env.prod" << ENVEOF
 # Generated $(date)
-MONGO_URL=${MONGO_URL}
+DATABASE_URL=${MONGO_URL}
 DATABASE_NAME=${DB_NAME}
 BASE_URL=${BASE_URL}
 SECRET_KEY=${SECRET_KEY}

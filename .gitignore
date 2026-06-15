@@ -152,6 +152,15 @@ error_log.txt
 replace_ips.py
 test_ssh.ps1
 image.png
+public_key.txt
+public_key2.txt
 
 # Flutter app
 flutter_app/
+
+# Local folders and commands
+images/
+scratch/
+command
+/package-lock.json
+

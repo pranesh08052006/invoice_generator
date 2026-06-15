@@ -14,11 +14,8 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8000:8000"
-    environment:
-      - DATABASE_URL=${MONGO_URL}
-      - DATABASE_NAME=${DATABASE_NAME}
-      - BASE_URL=${BASE_URL}
-      - SECRET_KEY=${SECRET_KEY}
+    env_file:
+      - .env.prod
     volumes:
       - uploads_data:/app/uploads
       - /etc/localtime:/etc/localtime:ro

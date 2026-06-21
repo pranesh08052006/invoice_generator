@@ -16,7 +16,7 @@ DB_NAME="invoice_app_db"
 DB_USER="invoice_user"
 DB_PASS="$(openssl rand -hex 16)"
 SECRET_KEY="$(openssl rand -hex 64)"
-BASE_URL="http://${SERVER_IP}:8000"
+BASE_URL="http://${SERVER_IP}/api"
 FRONTEND_URL="http://${SERVER_IP}"
 
 # ── COLORS ─────────────────────────────────────────────────
@@ -93,12 +93,16 @@ try {
   print('App DB user created');
 } catch(e) { print('User exists: ' + e.message); }
 " 2>/dev/null
+else
+    log_warn "MongoDB auth already configured — loading existing credentials"
+    if [ -f /root/.invoice_credentials ]; then
+        # shellcheck disable=SC1091
+        source /root/.invoice_credentials
+    fi
+fi
 
-    # Harden mongod.conf — bind localhost + docker bridge + enable auth
-    # Get docker bridge gateway (containers connect via this IP)
-    DOCKER_GW=$(docker network inspect bridge --format='{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo "172.17.0.1")
-
-    cat > /etc/mongod.conf << MONGOCFG
+# Ensure mongod.conf is correctly configured to bind to 0.0.0.0 (safe behind UFW) and has auth enabled
+cat > /etc/mongod.conf << MONGOCFG
 storage:
   dbPath: /var/lib/mongodb
 systemLog:
@@ -107,23 +111,16 @@ systemLog:
   path: /var/log/mongodb/mongod.log
 net:
   port: 27017
-  bindIp: 127.0.0.1,${DOCKER_GW}
+  bindIp: 0.0.0.0
 processManagement:
   timeZoneInfo: /usr/share/zoneinfo
 security:
   authorization: enabled
 MONGOCFG
 
-    systemctl restart mongod
-    sleep 5
-    log_success "MongoDB auth enabled (localhost only)"
-else
-    log_warn "MongoDB auth already configured — loading existing credentials"
-    if [ -f /root/.invoice_credentials ]; then
-        # shellcheck disable=SC1091
-        source /root/.invoice_credentials
-    fi
-fi
+systemctl restart mongod
+sleep 5
+log_success "MongoDB configured and restarted (bound to 0.0.0.0, auth enabled)"
 
 MONGO_URL="mongodb://${DB_USER}:${DB_PASS}@host.docker.internal:27017/${DB_NAME}?authSource=${DB_NAME}"
 

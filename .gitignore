@@ -162,3 +162,22 @@ scratch/
 command
 /package-lock.json
 
+# Flutter app (only run on mobile/local, not VPS)
+/flutter_app/
+
+# Local logs and test files
+backend/nohup.out
+test_dash.py
+test_dash_all.py
+test_dash_http.py
+test_dash_http2.py
+test_dash_http3.py
+get_log.py
+run_test.sh
+screen.png
+
+# Backend uploads
+backend/uploads/*
+!backend/uploads/logos/
+backend/uploads/logos/*
+!backend/uploads/logos/default_logo.png

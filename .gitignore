@@ -155,8 +155,6 @@ image.png
 public_key.txt
 public_key2.txt
 
-# Flutter app
-flutter_app/
 
 # Local folders and commands
 images/

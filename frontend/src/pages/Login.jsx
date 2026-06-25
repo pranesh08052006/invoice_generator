@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Eye, EyeOff, Mail, Lock, AlertTriangle, X } from 'lucide-react';
 import logo from '../assets/logo.png';
 import API_BASE_URL from '../config';
+import { Link } from 'react-router-dom';
 
 const Login = ({ login, sessionExpiredMsg, onDismissSessionMsg }) => {
   const [email, setEmail] = useState('');
@@ -25,6 +26,7 @@ const Login = ({ login, sessionExpiredMsg, onDismissSessionMsg }) => {
       const formData = new FormData();
       formData.append('username', email);
       formData.append('password', password);
+      formData.append('platform', 'web');
       const response = await axios.post(`${API_BASE_URL}/auth/login`, formData);
       login(response.data.user, response.data.access_token);
     } catch (err) {
@@ -364,8 +366,8 @@ const Login = ({ login, sessionExpiredMsg, onDismissSessionMsg }) => {
           color: '#4b5563'
         }}>
           Don't have an account?{' '}
-          <a 
-            href="#" 
+          <Link 
+            to="/signup" 
             style={{ 
               color: 'var(--primary-color)', 
               fontWeight: '600', 
@@ -375,8 +377,8 @@ const Login = ({ login, sessionExpiredMsg, onDismissSessionMsg }) => {
             onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
             onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
           >
-            Contact Admin
-          </a>
+            Create Account
+          </Link>
         </div>
       </div>
     </div>

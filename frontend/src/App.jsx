@@ -20,6 +20,7 @@ if (initialToken) {
 
 // Pages
 import Login from './pages/Login';
+import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Clients from './pages/Clients';
 import Products from './pages/Products';
@@ -733,6 +734,9 @@ const App = () => {
               sessionExpiredMsg={sessionExpiredMsg}
               onDismissSessionMsg={() => setSessionExpiredMsg('')}
             />
+          } />
+          <Route path="/signup" element={
+            <Signup login={login} />
           } />
           <Route path="*" element={<Navigate to="/login" />} />
         </Routes>

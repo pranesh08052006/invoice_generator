@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from typing import List, Optional
+from pydantic import BaseModel
 from datetime import datetime, timedelta
 import io
 from uuid import uuid4
@@ -13,7 +14,7 @@ from models import (
     User, UserRole, Client, Product, Invoice, InvoiceItem, InvoiceStatus, Company,
     Quotation, QuotationStatus, ProformaInvoice, ProformaStatus,
     PaymentRecord, StockAdjustment, Subscription, PlanType,
-    ExpenseCategory, PaymentMode, Expense
+    ExpenseCategory, PaymentMode, Expense, UserTransferHistory
 )
 
 from schemas import (
@@ -23,11 +24,11 @@ from schemas import (
     ChangePasswordRequest,
     ExpenseCategoryCreate, ExpenseCategoryOut,
     PaymentModeCreate, PaymentModeOut,
-    ExpenseCreate, ExpenseOut
+    ExpenseCreate, ExpenseOut, UserSignup
 )
 from auth import (
     get_password_hash, verify_password, create_access_token, 
-    get_current_user, check_role, SessionExpiredException
+    get_current_user, check_role, SessionExpiredException, logout_user_session
 )
 from pdf_gen import generate_invoice_pdf
 from contextlib import asynccontextmanager
@@ -51,6 +52,34 @@ async def lifespan(app: FastAPI):
             role=UserRole.SUPER_ADMIN
         )
         await super_admin.insert()
+
+    # Create default System Admin if not exists
+    system_admin = await User.find_one(User.is_system_admin == True)
+    if not system_admin:
+        system_admin = await User.find_one(User.email == "system@internal.digitalviyabari")
+    if not system_admin:
+        system_admin = User(
+            email="system@internal.digitalviyabari",
+            username="ADMIN",
+            hashed_password=get_password_hash(str(uuid4())), # generates a random password, cannot login
+            full_name="System Admin",
+            role=UserRole.ADMIN,
+            is_system_admin=True,
+            is_protected=True,
+            login_enabled=False,
+            has_full_access=True,
+            signup_source="SYSTEM_CREATED"
+        )
+        await system_admin.insert()
+
+    # Migrate existing users: if assigned_admin_id is missing, assign SYSTEM_ADMIN_ID
+    system_admin_id = str(system_admin.id)
+    async for u in User.find(User.assigned_admin_id == None):
+        if u.is_system_admin or u.role == UserRole.SUPER_ADMIN:
+            continue
+        u.assigned_admin_id = system_admin_id
+        await u.save()
+
     yield
 
 from fastapi.responses import JSONResponse
@@ -253,27 +282,83 @@ async def check_user_restriction(user: User, action_type: str, is_create: bool =
 
 from fastapi import Request
 
+async def update_last_activity(user: User):
+    user.last_activity = datetime.utcnow()
+    await user.save()
+
+# --- AUTH ---
 # --- AUTH ---
 @app.post("/auth/login")
-async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
-    user = await User.find_one(User.email == form_data.username)
-    if not user or not verify_password(form_data.password, user.hashed_password):
+async def login(request: Request):
+    username = None
+    password = None
+    platform = "web"
+    
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+            username = body.get("email") or body.get("username")
+            password = body.get("password")
+            platform = body.get("platform", "web")
+        except Exception:
+            pass
+            
+    if not username or not password:
+        try:
+            form = await request.form()
+            username = form.get("username") or form.get("email")
+            password = form.get("password")
+            platform = form.get("platform", "web")
+        except Exception:
+            pass
+
+    if not username or not password:
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
-    # Generate a fresh unique session ID — this immediately invalidates any
-    # previously issued token for this account on any other device/browser.
+    user = await User.find_one(User.email == username)
+    if not user or not verify_password(password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    if user.is_system_admin or not user.login_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="System Admin login is disabled."
+        )
+
+    # Generate a fresh unique session ID (always embedded in token for JWT integrity)
     session_id = str(uuid4())
 
     # Capture login metadata
     client_ip = request.client.host
-    user.current_session_id = session_id
+
+    # ADMIN: unlimited multi-device login — do NOT store/overwrite session IDs in DB.
+    # USER & SUPER_ADMIN: enforce single-active-session per platform.
+    if user.role != UserRole.ADMIN:
+        if platform == "mobile":
+            user.mobile_session_id = session_id
+        else:
+            user.web_session_id = session_id
+        user.current_session_id = session_id
+
     user.last_login_at = datetime.utcnow()
+    user.last_login = datetime.utcnow()
+    user.last_activity = datetime.utcnow()
     user.last_login_ip = client_ip
     user.last_login_device = parse_user_agent(request.headers.get("User-Agent", ""))
     await user.save()
 
-    # Embed session_id inside the JWT as the 'sid' claim
-    access_token = create_access_token(data={"sub": user.email}, session_id=session_id)
+    # Embed session_id, user_id, role, platform inside the JWT
+    access_token = create_access_token(
+        data={
+            "sub": user.email,
+            "user_id": str(user.id),
+            "role": user.role.value if hasattr(user.role, "value") else str(user.role),
+            "platform": platform
+        },
+        session_id=session_id,
+        platform=platform
+    )
 
     user_data = user.dict()
     user_data["id"] = str(user.id)
@@ -281,14 +366,15 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
 
 
 @app.post("/auth/logout")
-async def logout(current_user: User = Depends(get_current_user)):
+async def logout(request: Request, current_user: User = Depends(get_current_user)):
     """
-    Invalidates the current session by clearing current_session_id in the DB.
-    Any JWT that previously belonged to this session will be rejected on the
-    next request, even if it hasn't expired yet.
+    Invalidates the current session by clearing the platform-specific session ID in the DB.
     """
-    current_user.current_session_id = None
-    await current_user.save()
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+    await logout_user_session(current_user, token)
     return {"message": "Logged out successfully"}
 
 
@@ -298,10 +384,91 @@ async def change_password(data: ChangePasswordRequest, current_user: User = Depe
         raise HTTPException(status_code=400, detail="Incorrect current password")
     
     current_user.hashed_password = get_password_hash(data.new_password)
-    # Invalidate all active sessions (force login again) by generating a new session ID
+    # Invalidate all active sessions on both web and mobile
+    current_user.web_session_id = None
+    current_user.mobile_session_id = None
     current_user.current_session_id = str(uuid4())
     await current_user.save()
     return {"message": "Password changed successfully. Please log in again."}
+
+
+@app.post("/auth/signup")
+async def signup(request: Request, data: UserSignup):
+    # 1. Validate email uniqueness
+    existing = await User.find_one(User.email == data.email)
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # 2. Get SYSTEM_ADMIN_ID or DEFAULT_ADMIN_ID configuration
+    default_admin_id = os.getenv("DEFAULT_ADMIN_ID", "6a3a22b31da70629df949a39")
+    system_admin = await User.find_one(User.is_system_admin == True)
+    if not system_admin:
+        system_admin = await User.find_one(User.email == "system@internal.digitalviyabari")
+    system_admin_id = str(system_admin.id) if system_admin else default_admin_id
+    
+    # 3. Create User account
+    now = datetime.utcnow()
+    new_user = User(
+        email=data.email,
+        hashed_password=get_password_hash(data.password),
+        full_name=data.full_name,
+        role=UserRole.USER,
+        created_by_id=system_admin_id,
+        assigned_admin_id=system_admin_id,
+        signup_source="SELF_REGISTERED",
+        trial_start_date=now,
+        trial_end_date=now + timedelta(days=7),
+        has_full_access=False
+    )
+    await new_user.insert()
+    
+    # 4. Automatically create a 7-Day FREE_TRIAL subscription
+    new_sub = Subscription(
+        user_id=str(new_user.id),
+        plan_type=PlanType.FREE_TRIAL,
+        start_date=now,
+        end_date=now + timedelta(days=7),
+        is_active=True
+    )
+    await new_sub.insert()
+    
+    # 5. Automatically create company profile
+    new_company = Company(
+        user_id=str(new_user.id),
+        name=data.company_name,
+        mobile=data.mobile,
+        email=data.email,
+        gst_number=data.gst_number,
+        address="My Address"
+    )
+    await new_company.insert()
+    
+    # 6. Allow login immediately by generating a token
+    session_id = str(uuid4())
+    client_ip = request.client.host
+    new_user.web_session_id = session_id
+    new_user.current_session_id = session_id
+    new_user.last_login_at = now
+    new_user.last_login = now
+    new_user.last_activity = now
+    new_user.last_login_ip = client_ip
+    new_user.last_login_device = parse_user_agent(request.headers.get("User-Agent", ""))
+    await new_user.save()
+    
+    access_token = create_access_token(
+        data={
+            "sub": new_user.email,
+            "user_id": str(new_user.id),
+            "role": new_user.role.value if hasattr(new_user.role, "value") else str(new_user.role),
+            "platform": "web"
+        },
+        session_id=session_id,
+        platform="web"
+    )
+    
+    user_data = new_user.dict()
+    user_data["id"] = str(new_user.id)
+    return {"access_token": access_token, "token_type": "bearer", "user": user_data}
 
 
 @app.get("/auth/me", response_model=UserOut)
@@ -358,6 +525,44 @@ async def get_my_subscription(user: User = Depends(get_current_user)):
     }
 
 
+async def serialize_user_with_metadata(u: User) -> dict:
+    company = await Company.find_one(Company.user_id == str(u.id))
+    company_name = company.name if company else None
+    mobile = company.mobile if company else None
+    
+    assigned_admin_name = None
+    if u.assigned_admin_id:
+        admin_user = await User.get(u.assigned_admin_id)
+        if admin_user:
+            assigned_admin_name = admin_user.full_name
+            
+    return {
+        "id": str(u.id),
+        "email": u.email,
+        "full_name": u.full_name,
+        "role": u.role,
+        "has_full_access": u.has_full_access,
+        "trial_start_date": u.trial_start_date,
+        "trial_end_date": u.trial_end_date,
+        "created_at": u.created_at,
+        "last_login_at": u.last_login_at,
+        "last_login_device": u.last_login_device,
+        "last_login_ip": u.last_login_ip,
+        "last_activity_at": u.last_activity_at,
+        "assigned_admin_id": u.assigned_admin_id,
+        "last_login": u.last_login,
+        "last_activity": u.last_activity,
+        "signup_source": u.signup_source,
+        "username": u.username,
+        "is_system_admin": u.is_system_admin,
+        "is_protected": u.is_protected,
+        "login_enabled": u.login_enabled,
+        "company_name": company_name,
+        "mobile": mobile,
+        "assigned_admin_name": assigned_admin_name
+    }
+
+
 # --- ADMIN MANAGEMENT ---
 @app.post("/admin/users", response_model=UserOut)
 async def create_managed_user(
@@ -376,28 +581,28 @@ async def create_managed_user(
             raise HTTPException(status_code=400, detail="Email already registered")
 
         now = datetime.utcnow()
+        system_admin_id = None
+        if current_user.role != UserRole.ADMIN:
+            system_admin = await User.find_one(User.is_system_admin == True)
+            if not system_admin:
+                system_admin = await User.find_one(User.email == "system@internal.digitalviyabari")
+            if system_admin:
+                system_admin_id = str(system_admin.id)
+
         new_user = User(
             email=user_in.email,
             hashed_password=get_password_hash(user_in.password),
             full_name=user_in.full_name,
             role=user_in.role,
             created_by_id=str(current_user.id),
+            assigned_admin_id=str(current_user.id) if current_user.role == UserRole.ADMIN else system_admin_id,
             trial_start_date=now,
             trial_end_date=now + timedelta(days=7),
             has_full_access=False
         )
         await new_user.insert()
         
-        return {
-            "id": str(new_user.id),
-            "email": new_user.email,
-            "full_name": new_user.full_name,
-            "role": new_user.role,
-            "has_full_access": new_user.has_full_access,
-            "trial_start_date": new_user.trial_start_date,
-            "trial_end_date": new_user.trial_end_date,
-            "created_at": new_user.created_at
-        }
+        return await serialize_user_with_metadata(new_user)
     except Exception as e:
         print(f"ERROR CREATING USER: {str(e)}")
         if isinstance(e, HTTPException): raise e
@@ -409,22 +614,11 @@ async def list_managed_users(
 ):
     try:
         if current_user.role == UserRole.SUPER_ADMIN:
-            users = await User.find(User.role == UserRole.ADMIN).to_list()
+            users = await User.find(User.id != current_user.id).to_list()
         else:
-            users = await User.find(User.created_by_id == str(current_user.id), User.role == UserRole.USER).to_list()
+            users = await User.find(User.assigned_admin_id == str(current_user.id)).to_list()
         
-        return [
-            {
-                "id": str(u.id),
-                "email": u.email,
-                "full_name": u.full_name,
-                "role": u.role,
-                "has_full_access": u.has_full_access,
-                "trial_start_date": u.trial_start_date,
-                "trial_end_date": u.trial_end_date,
-                "created_at": u.created_at
-            } for u in users
-        ]
+        return [await serialize_user_with_metadata(u) for u in users]
     except Exception as e:
         print(f"ERROR LISTING USERS: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -439,6 +633,12 @@ async def toggle_full_access(
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
         
+    if target_user.is_system_admin or target_user.is_protected:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="System Admin is protected and cannot be modified."
+        )
+
     if current_user.role == UserRole.ADMIN and target_user.created_by_id != str(current_user.id):
         raise HTTPException(status_code=403, detail="Not authorized to manage this user")
         
@@ -454,6 +654,12 @@ async def delete_managed_user(
     target_user = await User.get(user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
+        
+    if target_user.is_system_admin or target_user.is_protected:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="System Admin is protected and cannot be deleted."
+        )
     
     if current_user.role == UserRole.SUPER_ADMIN:
         if target_user.role != UserRole.ADMIN:
@@ -475,17 +681,265 @@ async def delete_managed_user(
         await Company.find(Company.user_id == uid).delete()
         await Subscription.find(Subscription.user_id == uid).delete()
 
-    # Cascade delete in MongoDB
+    # Reassign subordinates to SYSTEM_ADMIN instead of deleting
     if target_user.role == UserRole.ADMIN:
-        subordinates = await User.find(User.created_by_id == str(target_user.id)).to_list()
-        for sub in subordinates:
-            await _purge_user_data(str(sub.id))
-            await sub.delete()
-    
+        system_admin = await User.find_one(User.is_system_admin == True)
+        if not system_admin:
+            system_admin = await User.find_one(User.email == "system@internal.digitalviyabari")
+        if not system_admin:
+            raise HTTPException(status_code=500, detail="System Admin not found. Cannot reassign users.")
+        
+        system_admin_id = str(system_admin.id)
+        
+        # Find all users assigned to or created by this Admin
+        subordinates = await User.find(User.assigned_admin_id == str(target_user.id)).to_list()
+        subordinates_by_creator = await User.find(User.created_by_id == str(target_user.id)).to_list()
+        all_subs = {str(s.id): s for s in subordinates + subordinates_by_creator}
+        
+        for sub_id, sub in all_subs.items():
+            from_admin = sub.assigned_admin_id
+            sub.assigned_admin_id = system_admin_id
+            sub.created_by_id = system_admin_id
+            await sub.save()
+            
+            # Log transfer history
+            history = UserTransferHistory(
+                user_id=str(sub.id),
+                from_admin_id=from_admin,
+                to_admin_id=system_admin_id,
+                transferred_by=str(current_user.id),
+                reason=f"Admin {target_user.email} deleted. Automated transfer to System Admin."
+            )
+            await history.insert()
+            
     await _purge_user_data(user_id)
     await target_user.delete()
-    
     return {"detail": "User removed successfully"}
+
+@app.get("/admin/system-admin-users", response_model=List[UserOut])
+async def list_system_admin_users(
+    current_user: User = Depends(check_role([UserRole.SUPER_ADMIN]))
+):
+    system_admin = await User.find_one(User.is_system_admin == True)
+    if not system_admin:
+        system_admin = await User.find_one(User.email == "system@internal.digitalviyabari")
+    if not system_admin:
+        return []
+    
+    users = await User.find(User.assigned_admin_id == str(system_admin.id)).to_list()
+    return [await serialize_user_with_metadata(u) for u in users]
+
+class ReassignUsersRequest(BaseModel):
+    user_ids: List[str]
+    to_admin_id: str
+    reason: Optional[str] = "Super Admin Reassignment"
+
+@app.post("/admin/reassign-users")
+async def reassign_users(
+    data: ReassignUsersRequest,
+    current_user: User = Depends(check_role([UserRole.SUPER_ADMIN]))
+):
+    target_admin = await User.get(data.to_admin_id)
+    if not target_admin:
+        raise HTTPException(status_code=404, detail="Target Admin not found")
+        
+    if target_admin.role != UserRole.ADMIN and not target_admin.is_system_admin:
+        raise HTTPException(
+            status_code=400,
+            detail="Users can only be reassigned to Admin or System Admin accounts."
+        )
+
+    transferred = []
+    for uid in data.user_ids:
+        u = await User.get(uid)
+        if not u:
+            continue
+        if u.is_system_admin or u.is_protected:
+            continue
+            
+        from_admin_id = u.assigned_admin_id
+        u.assigned_admin_id = data.to_admin_id
+        u.created_by_id = data.to_admin_id
+        await u.save()
+        
+        history = UserTransferHistory(
+            user_id=uid,
+            from_admin_id=from_admin_id,
+            to_admin_id=data.to_admin_id,
+            transferred_by=str(current_user.id),
+            reason=data.reason
+        )
+        await history.insert()
+        transferred.append(uid)
+        
+    return {"message": f"Successfully reassigned {len(transferred)} users", "transferred_user_ids": transferred}
+
+class UserSubscriptionUpdateRequest(BaseModel):
+    plan_type: PlanType
+    days: int = 365
+    is_active: bool = True
+
+@app.post("/admin/users/{user_id}/subscription")
+async def update_user_subscription(
+    user_id: str,
+    data: UserSubscriptionUpdateRequest,
+    current_user: User = Depends(check_role([UserRole.SUPER_ADMIN]))
+):
+    target_user = await User.get(user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    sub = await Subscription.find_one(Subscription.user_id == user_id)
+    now = datetime.utcnow()
+    if not sub:
+        sub = Subscription(
+            user_id=user_id,
+            plan_type=data.plan_type,
+            start_date=now,
+            end_date=now + timedelta(days=data.days),
+            is_active=data.is_active
+        )
+        await sub.insert()
+    else:
+        sub.plan_type = data.plan_type
+        sub.end_date = now + timedelta(days=data.days)
+        sub.is_active = data.is_active
+        await sub.save()
+        
+    return {
+        "message": "Subscription updated successfully",
+        "plan_type": sub.plan_type,
+        "end_date": sub.end_date,
+        "is_active": sub.is_active
+    }
+
+
+@app.get("/admin/my-users")
+async def get_my_users(current_user: User = Depends(check_role([UserRole.ADMIN]))):
+    try:
+        users = await User.find(User.assigned_admin_id == str(current_user.id)).to_list()
+        result = []
+        for u in users:
+            company = await Company.find_one(Company.user_id == str(u.id))
+            company_name = company.name if company else "My Company"
+            mobile = company.mobile if company else "0000000000"
+            
+            now = datetime.utcnow()
+            trial_status = "active"
+            if u.trial_end_date and now > u.trial_end_date:
+                trial_status = "expired"
+            if u.has_full_access:
+                trial_status = "full_access"
+                
+            status = "inactive"
+            if u.last_activity:
+                diff = (now - u.last_activity).days
+                if diff <= 7:
+                    status = "active"
+                elif diff <= 30:
+                    status = "less_active"
+            
+            result.append({
+                "id": str(u.id),
+                "full_name": u.full_name,
+                "email": u.email,
+                "company_name": company_name,
+                "mobile": mobile,
+                "trial_status": trial_status,
+                "trial_end_date": u.trial_end_date,
+                "created_at": u.created_at,
+                "last_login": u.last_login,
+                "last_activity": u.last_activity,
+                "signup_source": u.signup_source,
+                "status": status
+            })
+        return result
+    except Exception as e:
+        print(f"ERROR GETTING MY USERS: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/my-users/{user_id}/details")
+async def get_my_user_details(
+    user_id: str, 
+    current_user: User = Depends(check_role([UserRole.SUPER_ADMIN, UserRole.ADMIN]))
+):
+    try:
+        u = await User.get(user_id)
+        if not u:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        if current_user.role != UserRole.SUPER_ADMIN and u.assigned_admin_id != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not authorized to view this user")
+            
+        company = await Company.find_one(Company.user_id == str(u.id))
+        company_name = company.name if company else "My Company"
+        mobile = company.mobile if company else "0000000000"
+        
+        total_invoices = await Invoice.find(Invoice.user_id == str(u.id)).count()
+        total_products = await Product.find(Product.user_id == str(u.id)).count()
+        total_clients = await Client.find(Client.user_id == str(u.id)).count()
+        total_quotations = await Quotation.find(Quotation.user_id == str(u.id)).count()
+        total_proformas = await ProformaInvoice.find(ProformaInvoice.user_id == str(u.id)).count()
+        total_expenses = await Expense.find(Expense.user_id == str(u.id)).count()
+        total_payments = await PaymentRecord.find(PaymentRecord.user_id == str(u.id)).count()
+        
+        # Get subscription plan type
+        sub = await Subscription.find_one(Subscription.user_id == str(u.id))
+        plan_type = sub.plan_type if sub else "FREE_TRIAL"
+        
+        assigned_admin_name = "Unassigned"
+        if u.assigned_admin_id:
+            admin_user = await User.get(u.assigned_admin_id)
+            if admin_user:
+                assigned_admin_name = admin_user.full_name
+        
+        now = datetime.utcnow()
+        trial_status = "active"
+        if u.trial_end_date and now > u.trial_end_date:
+            trial_status = "expired"
+        if u.has_full_access:
+            trial_status = "full_access"
+            
+        return {
+            "basic_info": {
+                "id": str(u.id),
+                "full_name": u.full_name,
+                "email": u.email,
+                "company_name": company_name,
+                "mobile": mobile
+            },
+            "ownership_info": {
+                "assigned_admin_id": u.assigned_admin_id,
+                "assigned_admin_name": assigned_admin_name,
+                "signup_source": u.signup_source
+            },
+            "trial_info": {
+                "plan_type": plan_type,
+                "trial_status": trial_status,
+                "trial_start_date": u.trial_start_date,
+                "trial_end_date": u.trial_end_date,
+                "has_full_access": u.has_full_access
+            },
+            "usage_stats": {
+                "total_invoices": total_invoices,
+                "total_products": total_products,
+                "total_clients": total_clients,
+                "total_quotations": total_quotations,
+                "total_proformas": total_proformas,
+                "total_expenses": total_expenses,
+                "total_payments": total_payments
+            },
+            "activity_info": {
+                "last_login": u.last_login,
+                "last_activity": u.last_activity
+            }
+        }
+    except Exception as e:
+        print(f"ERROR GETTING MY USER DETAILS: {str(e)}")
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # --- COMPANY SETTINGS ---
 @app.get("/company", response_model=Optional[CompanyOut])
@@ -606,6 +1060,7 @@ async def create_client(
     try:
         new_client = Client(**client_in.dict(), user_id=str(user.id))
         await new_client.insert()
+        await update_last_activity(user)
         
         # Explicit construction for Pydantic V2 compatibility
         return {
@@ -692,6 +1147,7 @@ async def create_product(
     try:
         new_product = Product(**product_in.dict(), user_id=str(user.id))
         await new_product.insert()
+        await update_last_activity(user)
         return {
             "id": str(new_product.id),
             **new_product.dict(exclude={"id", "user_id"})
@@ -833,6 +1289,7 @@ async def create_invoice(
             items=items_to_save
         )
         await new_invoice.insert()
+        await update_last_activity(user)
         
         print(f"SUCCESS: Invoice {new_invoice.invoice_number} created with ID {new_invoice.id}")
 
@@ -1217,6 +1674,7 @@ async def create_quotation(
             items=items
         )
         await quotation.insert()
+        await update_last_activity(user)
         return {"id": str(quotation.id), "quotation_number": quotation.quotation_number, "total_amount": quotation.total_amount}
     except Exception as e:
         import traceback
@@ -1467,6 +1925,7 @@ async def create_proforma(
             items=items
         )
         await proforma.insert()
+        await update_last_activity(user)
         return {"id": str(proforma.id), "proforma_number": proforma.proforma_number, "total_amount": proforma.total_amount}
     except Exception as e:
         import traceback
@@ -1785,6 +2244,7 @@ async def create_payment(
         notes=pay_in.notes
     )
     await payment.insert()
+    await update_last_activity(user)
     
     # Update invoice paid_amount if linked
     if pay_in.invoice_id:

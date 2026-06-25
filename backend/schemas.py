@@ -22,6 +22,20 @@ class UserOut(BaseModel):
     last_login_device: Optional[str] = None
     last_login_ip: Optional[str] = None
     last_activity_at: Optional[datetime] = None
+    assigned_admin_id: Optional[str] = None
+    last_login: Optional[datetime] = None
+    last_activity: Optional[datetime] = None
+    signup_source: str = "ADMIN_CREATED"
+    
+    username: Optional[str] = None
+    is_system_admin: bool = False
+    is_protected: bool = False
+    login_enabled: bool = True
+
+    company_name: Optional[str] = None
+    mobile: Optional[str] = None
+    assigned_admin_name: Optional[str] = None
+
     class Config:
         from_attributes = True
 
@@ -236,3 +250,11 @@ class ExpenseOut(BaseModel):
     created_at: datetime
     class Config:
         from_attributes = True
+
+class UserSignup(BaseModel):
+    full_name: str
+    company_name: str
+    mobile: str
+    email: EmailStr
+    password: str
+    gst_number: Optional[str] = None

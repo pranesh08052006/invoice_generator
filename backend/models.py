@@ -40,6 +40,8 @@ class User(Document):
     last_login_ip: Optional[str] = None
     # Single-active-session fields
     current_session_id: Optional[str] = None   # UUID embedded in the JWT; only this session is valid
+    web_session_id: Optional[str] = None
+    mobile_session_id: Optional[str] = None
     last_login_at: Optional[datetime] = None    # Timestamp of the most recent successful login
     last_login_device: Optional[str] = None    # Parsed browser/device name
     last_activity_at: Optional[datetime] = None  # Timestamp of the user's last active request
@@ -48,6 +50,18 @@ class User(Document):
     trial_start_date: Optional[datetime] = None
     trial_end_date: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Administrative tracking fields
+    assigned_admin_id: Optional[str] = None
+    last_login: Optional[datetime] = None
+    last_activity: Optional[datetime] = None
+    signup_source: str = "ADMIN_CREATED"
+
+    # System Admin ownership architecture fields
+    username: Optional[str] = None
+    is_system_admin: bool = False
+    is_protected: bool = False
+    login_enabled: bool = True
 
     class Settings:
         name = "users"
@@ -277,3 +291,15 @@ class Expense(Document):
 
     class Settings:
         name = "expenses"
+
+# --- User Transfer History Model ---
+class UserTransferHistory(Document):
+    user_id: str
+    from_admin_id: Optional[str] = None
+    to_admin_id: str
+    transferred_by: str
+    reason: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "user_transfer_history"

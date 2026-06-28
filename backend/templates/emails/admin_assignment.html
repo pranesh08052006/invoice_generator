@@ -1,0 +1,25 @@
+{% extends "emails/base.html" %}
+
+{% block title %}New Admin Assignment - {{ company_name | default('Digital Viyabari') }}{% endblock %}
+
+{% block header %}Role Assignment{% endblock %}
+
+{% block content %}
+<p>Hello {{ user_name | default('Valued User') }},</p>
+<p>You have been assigned a new administrative role/permissions on the {{ company_name | default('Digital Viyabari') }} platform.</p>
+
+<p><strong>Assigned Role:</strong> {{ role_name | default('Administrator') }}</p>
+<p><strong>Assigned By:</strong> {{ assigner_name | default('System Administrator') }}</p>
+
+<p>Please log in to your account to review your new permissions and start managing your workspace.</p>
+
+<div style="text-align: center; margin: 30px 0;">
+  <a href="{{ login_url | default('#') }}" style="display: inline-block; background-color: #4f46e5; color: #ffffff; border-radius: 8px; padding: 12px 24px; font-size: 16px; font-weight: 600; text-decoration: none; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+    Login to Workspace
+  </a>
+</div>
+
+<p>If you did not expect this assignment, please reach out to your team manager or reply directly to this email.</p>
+<p>Regards,<br>
+{{ company_name | default('Invoice Digital Viyabari') }} Team</p>
+{% endblock %}

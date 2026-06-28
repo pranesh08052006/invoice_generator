@@ -757,7 +757,7 @@ const App = () => {
             <Route path="/reports" element={user?.role === 'user' ? <Reports user={user} company={company} /> : <Navigate to="/" />} />
             <Route path="/expenses" element={user?.role === 'user' ? <Expenses user={user} /> : <Navigate to="/" />} />
             
-            <Route path="/settings" element={<SettingsPage user={user} fetchCompanyGlobal={fetchCompany} />} />
+            <Route path="/settings" element={<SettingsPage user={user} company={company} fetchCompanyGlobal={fetchCompany} />} />
             
             {/* Admin management routes guarded for admins and super admins only */}
             <Route path="/admin/users" element={user?.role === 'super_admin' || user?.role === 'admin' ? <AdminUsers user={user} /> : <Navigate to="/" />} />

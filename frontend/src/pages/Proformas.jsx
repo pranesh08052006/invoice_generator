@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 
 const Proformas = ({ user }) => {
+  const [loading, setLoading] = useState(true);
   const [proformas, setProformas] = useState([]);
   const [clients, setClients] = useState([]);
   const location = useLocation();
@@ -42,8 +43,20 @@ const Proformas = ({ user }) => {
   };
 
   useEffect(() => { 
-    fetchProformas(); 
-    fetchClients();
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        await Promise.all([
+          fetchProformas(),
+          fetchClients()
+        ]);
+      } catch (err) {
+        console.error("Failed to load proforma data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, []);
 
   const handleDownload = async (id, number) => {
@@ -114,6 +127,15 @@ const Proformas = ({ user }) => {
   const draftVolume = proformas.filter(p => p.status === 'DRAFT').reduce((sum, p) => sum + (p.total_amount || 0), 0);
   
   const draftCount = proformas.filter(p => p.status === 'DRAFT').length;
+
+  if (loading) {
+    return (
+      <div className="loading-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', gap: '16px' }}>
+        <div className="loading-spinner" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>Loading proformas...</span>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '32px 40px', backgroundColor: '#f8fafc', minHeight: 'calc(100vh - 64px)' }}>

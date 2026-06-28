@@ -1,0 +1,24 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Update on Your Upgrade Request - {{ company_name | default('Digital Viyabari') }}{% endblock %}
+
+{% block header %}Upgrade Request Status{% endblock %}
+
+{% block content %}
+<p>Hello {{ user_name | default('Valued User') }},</p>
+<p>Thank you for submitting a request to upgrade your subscription plan. Unfortunately, our team was unable to approve your upgrade request at this time.</p>
+
+<p><strong>Reason for rejection:</strong> {{ rejection_reason | default('Unable to verify billing/payment details.') }}</p>
+
+<p>If you believe this was an error, or if you would like to submit updated payment verification documents, please update your billing info or reach out to our support team.</p>
+
+<div style="text-align: center; margin: 30px 0;">
+  <a href="{{ support_url | default('#') }}" style="display: inline-block; background-color: #ef4444; color: #ffffff; border-radius: 8px; padding: 12px 24px; font-size: 16px; font-weight: 600; text-decoration: none; box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.2);">
+    Contact Support
+  </a>
+</div>
+
+<p>We are here to assist you in getting your premium features activated.</p>
+<p>Regards,<br>
+{{ company_name | default('Invoice Digital Viyabari') }} Team</p>
+{% endblock %}

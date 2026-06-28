@@ -1,0 +1,22 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Your Trial is Expiring Soon - {{ company_name | default('Digital Viyabari') }}{% endblock %}
+
+{% block header %}Trial Expiry Reminder{% endblock %}
+
+{% block content %}
+<p>Hello {{ user_name | default('Valued User') }},</p>
+<p>We hope you have enjoyed using {{ company_name | default('Digital Viyabari') }} to manage your business operations. This is a quick reminder that your 7-day trial period is expiring on <strong>{{ expiry_date | default('soon') }}</strong>.</p>
+
+<p>To prevent any interruption in accessing your invoices, client database, and expense records, please upgrade your account to a premium subscription.</p>
+
+<div style="text-align: center; margin: 30px 0;">
+  <a href="{{ upgrade_url | default('#') }}" style="display: inline-block; background-color: #4f46e5; color: #ffffff; border-radius: 8px; padding: 12px 24px; font-size: 16px; font-weight: 600; text-decoration: none; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);">
+    Upgrade to Premium
+  </a>
+</div>
+
+<p>Your business data is safely stored, and upgrading will instantly unlock unlimited invoices, advanced reports, and multi-device admin access.</p>
+<p>Regards,<br>
+{{ company_name | default('Invoice Digital Viyabari') }} Team</p>
+{% endblock %}

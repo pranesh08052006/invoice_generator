@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from typing import List, Optional
 from datetime import datetime
 from models import UserRole, InvoiceStatus, QuotationStatus, ProformaStatus
@@ -258,3 +258,45 @@ class UserSignup(BaseModel):
     email: EmailStr
     password: str
     gst_number: Optional[str] = None
+
+
+# --- OTP / Password Reset Schemas ---
+class GenerateOTPRequest(BaseModel):
+    email: EmailStr
+
+class VerifyOTPRequest(BaseModel):
+    email: EmailStr
+    otp: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str
+    new_password: str
+    confirm_password: str
+
+    @model_validator(mode="after")
+    def validate_passwords(self) -> 'ResetPasswordRequest':
+        if self.new_password != self.confirm_password:
+            raise ValueError("Passwords do not match")
+        
+        p = self.new_password
+        if len(p) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not any(c.isupper() for c in p):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not any(c.islower() for c in p):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not any(c.isdigit() for c in p):
+            raise ValueError("Password must contain at least one number")
+        if not any(not c.isalnum() for c in p):
+            raise ValueError("Password must contain at least one special character")
+            
+        return self
+
+
+

@@ -1,0 +1,28 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Account Upgrade Approved! - {{ company_name | default('Digital Viyabari') }}{% endblock %}
+
+{% block header %}Upgrade Approved{% endblock %}
+
+{% block content %}
+<p>Hello {{ user_name | default('Valued User') }},</p>
+<p>Great news! Your request to upgrade to the premium subscription plan has been approved. Your account has now been activated with all premium features.</p>
+
+<p>You now have access to:</p>
+<ul>
+  <li>Unlimited Invoices and Proposals</li>
+  <li>Multi-Device Concurrent Admin Access</li>
+  <li>Advanced Revenue & Financial Reports</li>
+  <li>Priority Customer Support</li>
+</ul>
+
+<div style="text-align: center; margin: 30px 0;">
+  <a href="{{ dashboard_url | default('#') }}" style="display: inline-block; background-color: #10b981; color: #ffffff; border-radius: 8px; padding: 12px 24px; font-size: 16px; font-weight: 600; text-decoration: none; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);">
+    Go to Dashboard
+  </a>
+</div>
+
+<p>Thank you for partnering with us to grow your business.</p>
+<p>Regards,<br>
+{{ company_name | default('Invoice Digital Viyabari') }} Team</p>
+{% endblock %}

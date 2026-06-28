@@ -8,28 +8,50 @@ import {
   Palette, RotateCcw
 } from 'lucide-react';
 
-const SettingsPage = ({ user, fetchCompanyGlobal }) => {
+const SettingsPage = ({ user, company: globalCompany, fetchCompanyGlobal }) => {
   const navigate = useNavigate();
-  const [company, setCompany] = useState({
-    name: '',
-    address: '',
-    gst_number: '',
-    mobile: '',
-    email: '',
-    bank_name: '',
-    account_no: '',
-    ifsc: '',
-    account_type: 'Current',
-    account_holder_name: '',
-    upi_id: '',
-    primary_color: '#2563eb',
-    secondary_color: '#ffffff',
-    invoice_color: '#f59e0b',
-    signature_url: '',
-    logo_url: ''
+  const [company, setCompany] = useState(() => {
+    if (globalCompany) {
+      return {
+        name: globalCompany.name || '',
+        address: globalCompany.address || '',
+        gst_number: globalCompany.gst_number || '',
+        mobile: globalCompany.mobile || '',
+        email: globalCompany.email || '',
+        bank_name: globalCompany.bank_name || '',
+        account_no: globalCompany.account_no || '',
+        ifsc: globalCompany.ifsc || '',
+        account_type: globalCompany.account_type || 'Current',
+        account_holder_name: globalCompany.account_holder_name || '',
+        upi_id: globalCompany.upi_id || '',
+        primary_color: globalCompany.primary_color || '#2563eb',
+        secondary_color: globalCompany.secondary_color || '#ffffff',
+        invoice_color: globalCompany.invoice_color || '#f59e0b',
+        signature_url: globalCompany.signature_url || '',
+        logo_url: globalCompany.logo_url || ''
+      };
+    }
+    return {
+      name: '',
+      address: '',
+      gst_number: '',
+      mobile: '',
+      email: '',
+      bank_name: '',
+      account_no: '',
+      ifsc: '',
+      account_type: 'Current',
+      account_holder_name: '',
+      upi_id: '',
+      primary_color: '#2563eb',
+      secondary_color: '#ffffff',
+      invoice_color: '#f59e0b',
+      signature_url: '',
+      logo_url: ''
+    };
   });
   
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!globalCompany);
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [subscription, setSubscription] = useState(null);
@@ -52,6 +74,32 @@ const SettingsPage = ({ user, fetchCompanyGlobal }) => {
     fetchSubscription();
     fetchUserDetails();
   }, []);
+
+  // Sync state if globalCompany updates
+  useEffect(() => {
+    if (globalCompany) {
+      setCompany(prev => ({
+        ...prev,
+        name: globalCompany.name || prev.name,
+        address: globalCompany.address || prev.address,
+        gst_number: globalCompany.gst_number || prev.gst_number,
+        mobile: globalCompany.mobile || prev.mobile,
+        email: globalCompany.email || prev.email,
+        bank_name: globalCompany.bank_name || prev.bank_name,
+        account_no: globalCompany.account_no || prev.account_no,
+        ifsc: globalCompany.ifsc || prev.ifsc,
+        account_type: globalCompany.account_type || prev.account_type,
+        account_holder_name: globalCompany.account_holder_name || prev.account_holder_name,
+        upi_id: globalCompany.upi_id || prev.upi_id,
+        primary_color: globalCompany.primary_color || prev.primary_color,
+        secondary_color: globalCompany.secondary_color || prev.secondary_color,
+        invoice_color: globalCompany.invoice_color || prev.invoice_color,
+        signature_url: globalCompany.signature_url || prev.signature_url,
+        logo_url: globalCompany.logo_url || prev.logo_url
+      }));
+      setLoading(false);
+    }
+  }, [globalCompany]);
 
   const fetchUserDetails = async () => {
     try {
@@ -114,7 +162,6 @@ const SettingsPage = ({ user, fetchCompanyGlobal }) => {
     }
   };
 
-
   useEffect(() => {
     const primary = company.primary_color || '#2563eb';
     const secondary = company.secondary_color || '#ffffff';
@@ -133,7 +180,28 @@ const SettingsPage = ({ user, fetchCompanyGlobal }) => {
     }
     document.documentElement.style.setProperty('--primary-light', `rgba(${r}, ${g}, ${b}, 0.1)`);
     document.documentElement.style.setProperty('--primary-hover', `rgba(${r}, ${g}, ${b}, 0.85)`);
-  }, [company.primary_color, company.secondary_color]);
+
+    return () => {
+      // Revert colors to globalCompany when leaving settings page
+      const origPrimary = globalCompany?.primary_color || '#2563eb';
+      const origSecondary = globalCompany?.secondary_color || '#ffffff';
+
+      document.documentElement.style.setProperty('--primary-color', origPrimary);
+      document.documentElement.style.setProperty('--secondary-color', origSecondary);
+
+      let or = 37, og = 99, ob = 235;
+      if (origPrimary.startsWith('#')) {
+        const hex = origPrimary.replace('#', '');
+        if (hex.length === 6) {
+          or = parseInt(hex.substring(0, 2), 16);
+          og = parseInt(hex.substring(2, 4), 16);
+          ob = parseInt(hex.substring(4, 6), 16);
+        }
+      }
+      document.documentElement.style.setProperty('--primary-light', `rgba(${or}, ${og}, ${ob}, 0.1)`);
+      document.documentElement.style.setProperty('--primary-hover', `rgba(${or}, ${og}, ${ob}, 0.85)`);
+    };
+  }, [company.primary_color, company.secondary_color, globalCompany]);
 
   const fetchCompany = async () => {
     try {

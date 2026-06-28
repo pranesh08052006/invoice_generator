@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from typing import List, Optional
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import io
 from uuid import uuid4
 from bson import ObjectId
@@ -14,7 +14,7 @@ from models import (
     User, UserRole, Client, Product, Invoice, InvoiceItem, InvoiceStatus, Company,
     Quotation, QuotationStatus, ProformaInvoice, ProformaStatus,
     PaymentRecord, StockAdjustment, Subscription, PlanType,
-    ExpenseCategory, PaymentMode, Expense, UserTransferHistory
+    ExpenseCategory, PaymentMode, Expense, UserTransferHistory, PasswordResetToken, AuditLog
 )
 
 from schemas import (
@@ -24,7 +24,8 @@ from schemas import (
     ChangePasswordRequest,
     ExpenseCategoryCreate, ExpenseCategoryOut,
     PaymentModeCreate, PaymentModeOut,
-    ExpenseCreate, ExpenseOut, UserSignup
+    ExpenseCreate, ExpenseOut, UserSignup,
+    GenerateOTPRequest, VerifyOTPRequest, ForgotPasswordRequest, ResetPasswordRequest
 )
 from auth import (
     get_password_hash, verify_password, create_access_token, 
@@ -32,6 +33,8 @@ from auth import (
 )
 from pdf_gen import generate_invoice_pdf
 from contextlib import asynccontextmanager
+import logging
+import asyncio
 import os
 import shutil
 from fastapi.staticfiles import StaticFiles
@@ -80,15 +83,63 @@ async def lifespan(app: FastAPI):
         u.assigned_admin_id = system_admin_id
         await u.save()
 
+    # --- Email Hardening Startup Validation & Worker Activation ---
+    try:
+        email_service.validate_configuration()
+    except Exception as e:
+        logging.getLogger("app").error(f"Email service configuration invalid on startup: {str(e)}")
+
+    try:
+        health_status = await email_service.health_check()
+        if health_status.get("status") != "healthy":
+            logging.getLogger("app").error(f"SMTP connection health check failed on startup: {health_status.get('message')}")
+    except Exception as e:
+        logging.getLogger("app").error(f"SMTP connection check failed on startup: {str(e)}")
+
+    from services.email.queue import email_queue
+    email_queue.start_worker()
+
     yield
 
+    # --- Email Worker Shutdown ---
+    try:
+        from services.email.queue import email_queue
+        await email_queue.stop_worker()
+    except Exception as e:
+        logging.getLogger("app").error(f"Failed to stop email worker cleanly: {str(e)}")
+
 from fastapi.responses import JSONResponse
+from services.email.email_service import email_service
+from services.otp.otp_service import otp_service, OTPRateLimitError
 
 app = FastAPI(title="Pro Invoice SaaS", lifespan=lifespan)
+
+class TestEmailRequest(BaseModel):
+    email: str
+    subject: str
+    message: str
 
 @app.get("/health", include_in_schema=False)
 async def health_check():
     return {"status": "ok"}
+
+@app.post("/test-email")
+async def test_email(data: TestEmailRequest):
+    res = await email_service.send_plain_text_email(
+        recipient=data.email,
+        subject=data.subject,
+        text_content=data.message
+    )
+    if res["status"] == "failure":
+        return JSONResponse(status_code=400, content=res)
+    return res
+
+@app.get("/email/health")
+async def email_health():
+    res = await email_service.health_check()
+    if res["status"] == "unhealthy":
+        return JSONResponse(status_code=500, content=res)
+    return res
 
 @app.exception_handler(SessionExpiredException)
 async def session_expired_exception_handler(request: Request, exc: SessionExpiredException):
@@ -390,6 +441,222 @@ async def change_password(data: ChangePasswordRequest, current_user: User = Depe
     current_user.current_session_id = str(uuid4())
     await current_user.save()
     return {"message": "Password changed successfully. Please log in again."}
+
+
+@app.post("/auth/generate-reset-otp")
+async def generate_reset_otp(request: Request, data: GenerateOTPRequest):
+    # Validate user exists
+    user = await User.find_one(User.email == data.email)
+    if not user:
+        # Prevent user enumeration: return success even if user not found
+        return {"success": True, "message": "OTP Generated Successfully"}
+
+    try:
+        await otp_service.generate_otp(
+            email=data.email,
+            purpose="PASSWORD_RESET",
+            request_ip=request.client.host if request.client else None,
+            request_user_agent=request.headers.get("user-agent")
+        )
+        return {"success": True, "message": "OTP Generated Successfully"}
+    except OTPRateLimitError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred."
+        )
+
+
+@app.post("/auth/verify-reset-otp")
+async def verify_reset_otp(data: VerifyOTPRequest):
+    # 1. User exists
+    user = await User.find_one(User.email == data.email)
+    if not user:
+        return {"success": False, "verified": False, "message": "User not found."}
+
+    try:
+        res = await otp_service.verify_otp(
+            email=data.email,
+            otp=data.otp,
+            purpose="PASSWORD_RESET",
+            mark_used=False
+        )
+        if res.get("success"):
+            return {
+                "success": True,
+                "verified": True,
+                "message": "OTP Verified Successfully"
+            }
+        else:
+            return {
+                "success": False,
+                "verified": False,
+                "message": res.get("message", "Invalid OTP")
+            }
+    except Exception as e:
+        logger.error(f"OTP Verification failed for {data.email}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred."
+        )
+
+
+@app.post("/auth/reset-password")
+async def reset_password(data: ResetPasswordRequest, request: Request):
+    # 1. User exists
+    user = await User.find_one(User.email == data.email)
+    if not user:
+        return {"success": False, "message": "User not found."}
+
+    # 2. OTP Validation (Verify again, marking it used)
+    try:
+        res = await otp_service.verify_otp(
+            email=data.email,
+            otp=data.otp,
+            purpose="PASSWORD_RESET",
+            mark_used=True
+        )
+        if not res.get("success"):
+            return {"success": False, "message": res.get("message", "Invalid OTP")}
+    except Exception as e:
+        logger.error(f"OTP verification failed during password reset for {data.email}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred during verification."
+        )
+
+    # 3. Update password hash & Session Invalidation
+    try:
+        user.hashed_password = get_password_hash(data.new_password)
+        user.current_session_id = None
+        user.web_session_id = None
+        user.mobile_session_id = None
+        await user.save()
+    except Exception as e:
+        logger.error(f"Failed to update user password/sessions for {data.email}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update credentials."
+        )
+
+    # 4. Create Audit Log
+    try:
+        audit_log = AuditLog(
+            user_id=str(user.id),
+            email=user.email,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+            timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
+            action="PASSWORD_RESET"
+        )
+        await audit_log.insert()
+    except Exception as e:
+        logger.error(f"Failed to create audit log for {data.email}: {str(e)}")
+
+    # 5. Send Email Confirmation (in thread pool via email_service)
+    try:
+        await email_service.send_html_email(
+            recipient=user.email,
+            subject="Password Changed Successfully",
+            template_name="emails/password_reset_success.html",
+            context={
+                "company_name": "Invoice Digital Viyabari",
+                "current_year": datetime.now(timezone.utc).year
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to send password reset confirmation email to {user.email}: {str(e)}")
+
+    return {"success": True, "message": "Password reset successfully. Please login again."}
+
+
+logger = logging.getLogger("email_service")
+
+
+@app.post("/auth/forgot-password")
+async def forgot_password(request: Request, data: ForgotPasswordRequest):
+    """
+    Forgot Password Endpoint.
+    
+    Receives email, verifies format, checks user existence.
+    Generates a secure OTP, saves it, renders forgot_password.html,
+    and sends it via EmailService with 3x retry policy.
+    
+    Always returns a success response to prevent email enumeration.
+    """
+    # Step 1: Validate email format (Pydantic EmailStr does this)
+    # Step 2: Search user
+    user = await User.find_one(User.email == data.email)
+    if not user:
+        # Anti-enumeration: return success response immediately
+        return {"success": True, "message": "If the email exists, an OTP has been sent."}
+
+    # Step 3: Call OTPService to generate, hash, and store OTP
+    try:
+        raw_otp = await otp_service.generate_otp(
+            email=data.email,
+            purpose="PASSWORD_RESET",
+            request_ip=request.client.host if request.client else None,
+            request_user_agent=request.headers.get("user-agent")
+        )
+    except OTPRateLimitError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"OTP Generation failed for {data.email}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process request. Please try again later."
+        )
+
+    # Step 4: Render HTML Template and Send via EmailService with 3x retry
+
+    max_retries = 3
+    email_sent = False
+    last_error_msg = ""
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            res = await email_service.send_html_email(
+                recipient=data.email,
+                subject="Password Reset Request",
+                template_name="emails/forgot_password.html",
+                context={
+                    "company_name": "Invoice Digital Viyabari",
+                    "otp": raw_otp,
+                    "expiry_minutes": 10,
+                    "support_email": "support@digitalviyabari.com",
+                    "current_year": datetime.now(timezone.utc).year
+                }
+            )
+            if res.get("status") == "success":
+                email_sent = True
+                break
+            else:
+                last_error_msg = res.get("message", "Unknown SMTP error")
+                logger.warning(f"SMTP send attempt {attempt} failed for {data.email}: {last_error_msg}")
+        except Exception as e:
+            last_error_msg = str(e)
+            logger.warning(f"SMTP send attempt {attempt} encountered exception for {data.email}: {last_error_msg}")
+
+        # Exponential delay: 2, 4 seconds
+        if attempt < max_retries:
+            await asyncio.sleep(2 ** attempt)
+
+    if not email_sent:
+        logger.error(f"All {max_retries} attempts to send forgot password email to {data.email} failed. Last error: {last_error_msg}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send password reset email. Please try again later."
+        )
+
+    return {"success": True, "message": "If the email exists, an OTP has been sent."}
 
 
 @app.post("/auth/signup")
@@ -773,6 +1040,110 @@ async def reassign_users(
         transferred.append(uid)
         
     return {"message": f"Successfully reassigned {len(transferred)} users", "transferred_user_ids": transferred}
+
+
+# --- Super Admin Email Monitoring & Health API ---
+@app.get("/system/email-health")
+async def get_email_health(current_user: User = Depends(check_role([UserRole.SUPER_ADMIN]))):
+    # 1. Config Check
+    config_ok = True
+    config_err = None
+    try:
+        email_service.validate_configuration()
+    except Exception as e:
+        config_ok = False
+        config_err = str(e)
+
+    # 2. Template Engine Check
+    templates_ok = False
+    try:
+        templates_ok = os.path.isdir(email_service.renderer.templates_dir)
+    except Exception:
+        pass
+
+    # 3. Queue Check
+    from services.email.queue import email_queue
+    queue_ok = email_queue._worker_task is not None and not email_queue._worker_task.done()
+
+    # 4. SMTP / Connection Check
+    smtp_health = await email_service.health_check()
+    smtp_ok = smtp_health.get("status") == "healthy"
+
+    health_status = "healthy" if (config_ok and templates_ok and queue_ok and smtp_ok) else "unhealthy"
+
+    return {
+        "status": health_status,
+        "details": {
+            "smtp_reachable": smtp_ok,
+            "authentication_successful": smtp_ok,
+            "template_engine_working": templates_ok,
+            "configuration_loaded": config_ok,
+            "config_error": config_err,
+            "queue_operational": queue_ok
+        }
+    }
+
+
+@app.get("/system/email-dashboard")
+async def get_email_dashboard(current_user: User = Depends(check_role([UserRole.SUPER_ADMIN]))):
+    from models import EmailLog
+
+    # Total count by statuses
+    total_sent = await EmailLog.find(EmailLog.status == "Sent").count()
+    total_failed = await EmailLog.find(EmailLog.status == "Failed").count()
+    total_pending = await EmailLog.find(EmailLog.status == "Queued").count()
+
+    # Today's count
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).replace(tzinfo=None)
+    todays_emails = await EmailLog.find(EmailLog.created_time >= today_start).count()
+
+    # Last error
+    last_failed = await EmailLog.find(EmailLog.status == "Failed").sort("-created_time").first_or_none()
+    last_error = last_failed.error_message if last_failed else None
+
+    # Recent activity
+    recent_logs = await EmailLog.find().sort("-created_time").limit(20).to_list()
+    recent_activity = [
+        {
+            "id": str(log.id),
+            "recipient": log.recipient,
+            "subject": log.subject,
+            "template_name": log.template_name,
+            "status": log.status,
+            "retry_count": log.retry_count,
+            "error_message": log.error_message,
+            "created_time": log.created_time,
+            "sent_time": log.sent_time
+        }
+        for log in recent_logs
+    ]
+
+    # Rate Monitoring
+    one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+    one_day_ago = datetime.utcnow() - timedelta(days=1)
+    
+    emails_per_hour = await EmailLog.find(EmailLog.status == "Sent", EmailLog.sent_time >= one_hour_ago).count()
+    emails_per_day = await EmailLog.find(EmailLog.status == "Sent", EmailLog.sent_time >= one_day_ago).count()
+    
+    total_retries = 0
+    async for log in EmailLog.find(EmailLog.retry_count > 0):
+        total_retries += log.retry_count
+
+    return {
+        "metrics": {
+            "total_sent": total_sent,
+            "total_failed": total_failed,
+            "total_pending": total_pending,
+            "todays_emails": todays_emails,
+            "last_error": last_error
+        },
+        "rate_monitoring": {
+            "emails_per_hour": emails_per_hour,
+            "emails_per_day": emails_per_day,
+            "total_retries": total_retries
+        },
+        "recent_activity": recent_activity
+    }
 
 class UserSubscriptionUpdateRequest(BaseModel):
     plan_type: PlanType

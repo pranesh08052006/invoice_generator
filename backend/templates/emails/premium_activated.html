@@ -1,0 +1,36 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Premium Activated! - Digital Viyabari{% endblock %}
+
+{% block header %}Subscription Premium Activated{% endblock %}
+
+{% block content %}
+<p>Hello {{ user_name | default('Valued User') }},</p>
+<p>We are excited to inform you that your premium subscription for Digital Viyabari has been successfully activated!</p>
+
+<p>Your account now has full access to all premium features, including:</p>
+<ul style="padding-left: 20px; margin-bottom: 20px;">
+  <li style="margin-bottom: 8px;">Unlimited Invoice & Quotation generation.</li>
+  <li style="margin-bottom: 8px;">Full Expense and Payment tracking.</li>
+  <li style="margin-bottom: 8px;">Detailed Financial and Stock reports.</li>
+  <li style="margin-bottom: 8px;">Multi-device Admin capabilities.</li>
+</ul>
+
+<table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border-radius: 8px; padding: 20px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+  <tr>
+    <td><strong>Subscription Plan:</strong></td>
+    <td align="right">{{ plan_name | default('Premium Plan') }}</td>
+  </tr>
+  <tr>
+    <td><strong>Status:</strong></td>
+    <td align="right" style="color: #16a34a; font-weight: 600;">Active</td>
+  </tr>
+  <tr>
+    <td><strong>Renewal Date:</strong></td>
+    <td align="right">{{ renewal_date | default('N/A') }}</td>
+  </tr>
+</table>
+
+<p>Thank you for supporting Digital Viyabari. We hope our platform helps scale your business successfully.</p>
+<p>Sincerely,<br>The Digital Viyabari Team</p>
+{% endblock %}

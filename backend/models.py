@@ -303,3 +303,60 @@ class UserTransferHistory(Document):
 
     class Settings:
         name = "user_transfer_history"
+
+
+# --- Password Reset & OTP Tokens Model ---
+class PasswordResetToken(Document):
+    email: Indexed(str)
+    otp_hash: str
+    purpose: str = "PASSWORD_RESET"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: datetime
+    used: bool = False
+    used_at: Optional[datetime] = None
+    request_ip: Optional[str] = None
+    request_user_agent: Optional[str] = None
+    attempt_count: int = 0
+
+    class Settings:
+        name = "password_reset_tokens"
+
+
+# --- Audit Log Model ---
+class AuditLog(Document):
+    user_id: Optional[str] = None
+    email: str
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    action: str = "PASSWORD_RESET"
+
+    class Settings:
+        name = "audit_logs"
+
+
+# --- Email Hardening Models ---
+class EmailLog(Document):
+    recipient: str
+    subject: str
+    template_name: str
+    status: str = "Queued"  # "Queued", "Sent", "Failed"
+    retry_count: int = 0
+    error_message: Optional[str] = None
+    created_time: datetime = Field(default_factory=datetime.utcnow)
+    sent_time: Optional[datetime] = None
+
+    class Settings:
+        name = "email_logs"
+
+
+class EmailAudit(Document):
+    triggered_by: str  # user_id or "system"
+    recipient: str
+    email_type: str  # e.g., "Forgot Password", "Welcome", etc.
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    status: str
+
+    class Settings:
+        name = "email_audits"
+

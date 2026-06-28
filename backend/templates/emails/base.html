@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Digital Viyabari{% endblock %}</title>
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background-color: #f8fafc;
+      color: #334155;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+<body style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #334155; margin: 0; padding: 0;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; padding: 40px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); overflow: hidden; border: 1px solid #e2e8f0;">
+          
+          <!-- HEADER -->
+          <tr>
+            <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);">
+              <!-- Company Logo Placeholder -->
+              <div style="margin-bottom: 15px;">
+                <img src="{{ logo_url | default('https://digitalviyabari.com/logo.png') }}" alt="Digital Viyabari Logo" style="height: 50px; width: auto; max-width: 100%; border: 0;" />
+              </div>
+              <h1 style="color: #ffffff; font-size: 24px; font-weight: 700; margin: 0; letter-spacing: -0.025em;">
+                {% block header %}{{ company_name | default('Digital Viyabari') }}{% endblock %}
+              </h1>
+            </td>
+          </tr>
+          
+          <!-- BODY -->
+          <tr>
+            <td style="padding: 40px; background-color: #ffffff; line-height: 1.6; font-size: 16px;">
+              {% block content %}
+              <!-- Overridden by child templates -->
+              {% endblock %}
+            </td>
+          </tr>
+          
+          <!-- FOOTER -->
+          <tr>
+            <td style="padding: 30px 40px; background-color: #f1f5f9; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0 0 10px 0;">
+                If you have any questions, feel free to reply to this email or contact support.
+              </p>
+              <p style="margin: 0; font-weight: 600;">
+                {{ company_name | default('Invoice Digital Viyabari') }}
+              </p>
+              <p style="margin: 5px 0 0 0;">
+                &copy; {{ current_year | default('2026') }} Digital Viyabari. All rights reserved.
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

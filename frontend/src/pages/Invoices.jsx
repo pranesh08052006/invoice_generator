@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 
 const Invoices = ({ user }) => {
+  const [loading, setLoading] = useState(true);
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -69,9 +70,21 @@ const Invoices = ({ user }) => {
   };
 
   useEffect(() => { 
-    fetchInvoices(); 
-    fetchClients();
-    fetchPayments();
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        await Promise.all([
+          fetchInvoices(),
+          fetchClients(),
+          fetchPayments()
+        ]);
+      } catch (err) {
+        console.error("Failed to load invoice data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, []);
 
   const handleDownload = async (id, number) => {
@@ -331,6 +344,15 @@ const Invoices = ({ user }) => {
   const pendingSettlement = Math.max(0, totalVolume - realizedRevenue);
   const unpaidCount = invoices.filter(inv => inv.status?.toLowerCase() !== 'paid' && inv.status?.toLowerCase() !== 'draft').length;
   const draftCount = invoices.filter(inv => inv.status?.toLowerCase() === 'draft').length;
+
+  if (loading) {
+    return (
+      <div className="loading-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', gap: '16px' }}>
+        <div className="loading-spinner" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>Loading ledger...</span>
+      </div>
+    );
+  }
 
   return (
     <>

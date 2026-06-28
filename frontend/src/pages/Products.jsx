@@ -9,6 +9,7 @@ const DEFAULT_UNITS = ['Units', 'Pcs', 'Hrs', 'Nos', 'Kg', 'Ltr', 'Mtr'];
 
 const Products = ({ user }) => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -29,12 +30,15 @@ const Products = ({ user }) => {
     gst_percent: 0, stock: 0, image_url: ''
   });
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (silent = false) => {
     try {
+      if (!silent) setLoading(true);
       const response = await axios.get(`${API_BASE_URL}/products`);
       setProducts(response.data);
     } catch (err) { 
       console.error(err); 
+    } finally {
+      if (!silent) setLoading(false);
     }
   };
 
@@ -59,7 +63,7 @@ const Products = ({ user }) => {
         await axios.post(`${API_BASE_URL}/products`, payload);
       }
       closeModal();
-      fetchProducts();
+      fetchProducts(true);
     } catch (err) {
       alert('Error saving product. Check if all fields are valid.');
     }
@@ -87,7 +91,7 @@ const Products = ({ user }) => {
     if (!window.confirm('Are you sure you want to delete this product? This action cannot be undone.')) return;
     try {
       await axios.delete(`${API_BASE_URL}/products/${id}`);
-      fetchProducts();
+      fetchProducts(true);
     } catch (err) {
       alert('Error deleting product');
     }
@@ -123,6 +127,15 @@ const Products = ({ user }) => {
   const lowStockCount = products.filter(p => p.stock <= 10 && p.stock > 0).length;
   const outOfStockCount = products.filter(p => p.stock <= 0).length;
   const wellStockedCount = products.filter(p => p.stock > 10).length;
+
+  if (loading) {
+    return (
+      <div className="loading-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', gap: '16px' }}>
+        <div className="loading-spinner" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>Loading inventory...</span>
+      </div>
+    );
+  }
 
   return (
     <>

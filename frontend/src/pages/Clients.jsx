@@ -7,6 +7,7 @@ import { Search, Plus, Phone, MessageSquare, Hash, X, MapPin, Edit3, Trash2, Use
 
 const Clients = ({ user, company }) => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
   const [clients, setClients] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [quotations, setQuotations] = useState([]);
@@ -98,8 +99,9 @@ const Clients = ({ user, company }) => {
     window.open(`https://wa.me/${finalPhone}?text=${encodedMessage}`, '_blank');
   };
 
-  const fetchClients = async () => {
+  const fetchClients = async (silent = false) => {
     try {
+      if (!silent) setLoading(true);
       const [cRes, iRes, qRes, pRes, payRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/clients`),
         axios.get(`${API_BASE_URL}/invoices`),
@@ -114,6 +116,8 @@ const Clients = ({ user, company }) => {
       setPayments(payRes.data || []);
     } catch (err) { 
       console.error(err); 
+    } finally {
+      if (!silent) setLoading(false);
     }
   };
 
@@ -133,7 +137,7 @@ const Clients = ({ user, company }) => {
       });
       setShowPaymentModal(false);
       setPaymentForm({ amount: '', payment_method: 'CASH', notes: '' });
-      await fetchClients();
+      await fetchClients(true);
     } catch (err) {
       alert('Failed to record payment. Please try again.');
     } finally {
@@ -344,7 +348,7 @@ const Clients = ({ user, company }) => {
       }
       
       closeModal();
-      fetchClients();
+      fetchClients(true);
     } catch (err) {
       console.error("Save client error:", err.response?.data || err);
       const errorMsg = err.response?.data?.detail || err.message || 'Error saving client. Please check all fields.';
@@ -391,7 +395,7 @@ const Clients = ({ user, company }) => {
     if (!clientToDelete) return;
     try {
       await axios.delete(`${API_BASE_URL}/clients/${clientToDelete.id}`);
-      fetchClients();
+      fetchClients(true);
       setClientToDelete(null);
       setDeleteConfirmationText('');
     } catch (err) {
@@ -439,6 +443,15 @@ const Clients = ({ user, company }) => {
       if (sortBy === 'balance_desc') return getClientBalance(b) - getClientBalance(a);
       return 0;
     });
+
+  if (loading) {
+    return (
+      <div className="loading-state" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', gap: '16px' }}>
+        <div className="loading-spinner" style={{ width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>Loading registry...</span>
+      </div>
+    );
+  }
 
   return (
     <>

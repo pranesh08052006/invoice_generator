@@ -12,8 +12,10 @@ const Signup = ({ login }) => {
   const [mobile, setMobile] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [gstNumber, setGstNumber] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,11 +26,18 @@ const Signup = ({ login }) => {
   const [mobileFocused, setMobileFocused] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
   const [gstFocused, setGstFocused] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -171,7 +180,7 @@ const Signup = ({ login }) => {
                   }} />
                   <input
                     type="text"
-                    placeholder="John Doe"
+                    placeholder=""
                     value={fullName}
                     onChange={e => setFullName(e.target.value)}
                     onFocus={() => setNameFocused(true)}
@@ -211,7 +220,7 @@ const Signup = ({ login }) => {
                   }} />
                   <input
                     type="text"
-                    placeholder="Acme Corp"
+                    placeholder=""
                     value={companyName}
                     onChange={e => setCompanyName(e.target.value)}
                     onFocus={() => setCompanyFocused(true)}
@@ -253,7 +262,7 @@ const Signup = ({ login }) => {
                   }} />
                   <input
                     type="email"
-                    placeholder="you@company.com"
+                    placeholder=""
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     onFocus={() => setEmailFocused(true)}
@@ -293,7 +302,7 @@ const Signup = ({ login }) => {
                   }} />
                   <input
                     type="tel"
-                    placeholder="9999999999"
+                    placeholder=""
                     value={mobile}
                     onChange={e => setMobile(e.target.value)}
                     onFocus={() => setMobileFocused(true)}
@@ -318,7 +327,7 @@ const Signup = ({ login }) => {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               {/* Password */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em' }}>
@@ -335,7 +344,7 @@ const Signup = ({ login }) => {
                   }} />
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
+                    placeholder=""
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     onFocus={() => setPasswordFocused(true)}
@@ -378,43 +387,102 @@ const Signup = ({ login }) => {
                 </div>
               </div>
 
-              {/* GST Number */}
+              {/* Confirm Password */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em' }}>
-                  GST NUMBER (OPTIONAL)
+                  CONFIRM PASSWORD
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <FileText size={16} style={{ 
+                  <Lock size={16} style={{ 
                     position: 'absolute', 
                     left: '12px', 
                     top: '50%', 
                     transform: 'translateY(-50%)', 
-                    color: gstFocused ? 'var(--primary-color)' : '#9ca3af',
+                    color: confirmPasswordFocused ? 'var(--primary-color)' : '#9ca3af',
                     transition: 'color 0.2s ease'
                   }} />
                   <input
-                    type="text"
-                    placeholder="22AAAAA0000A1Z5"
-                    value={gstNumber}
-                    onChange={e => setGstNumber(e.target.value)}
-                    onFocus={() => setGstFocused(true)}
-                    onBlur={() => setGstFocused(false)}
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder=""
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    onFocus={() => setConfirmPasswordFocused(true)}
+                    onBlur={() => setConfirmPasswordFocused(false)}
+                    required
                     style={{
                       width: '100%',
                       height: '44px',
                       paddingLeft: '38px',
-                      paddingRight: '12px',
+                      paddingRight: '40px',
                       borderRadius: '8px',
-                      border: `1px solid ${gstFocused ? 'var(--primary-color)' : '#d1d5db'}`,
+                      border: `1px solid ${confirmPasswordFocused ? 'var(--primary-color)' : '#d1d5db'}`,
                       outline: 'none',
                       backgroundColor: '#ffffff',
                       color: '#1f2937',
                       fontSize: '13px',
                       transition: 'all 0.2s ease',
-                      boxShadow: gstFocused ? '0 0 0 3px var(--primary-light)' : 'none'
+                      boxShadow: confirmPasswordFocused ? '0 0 0 3px var(--primary-light)' : 'none'
                     }}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#9ca3af',
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
+              </div>
+            </div>
+
+            {/* GST Number */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '24px' }}>
+              <label style={{ fontSize: '11px', fontWeight: '700', color: '#4b5563', letterSpacing: '0.05em' }}>
+                GST NUMBER (OPTIONAL)
+              </label>
+              <div style={{ position: 'relative' }}>
+                <FileText size={16} style={{ 
+                  position: 'absolute', 
+                  left: '12px', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)', 
+                  color: gstFocused ? 'var(--primary-color)' : '#9ca3af',
+                  transition: 'color 0.2s ease'
+                }} />
+                <input
+                  type="text"
+                  placeholder=""
+                  value={gstNumber}
+                  onChange={e => setGstNumber(e.target.value)}
+                  onFocus={() => setGstFocused(true)}
+                  onBlur={() => setGstFocused(false)}
+                  style={{
+                    width: '100%',
+                    height: '44px',
+                    paddingLeft: '38px',
+                    paddingRight: '12px',
+                    borderRadius: '8px',
+                    border: `1px solid ${gstFocused ? 'var(--primary-color)' : '#d1d5db'}`,
+                    outline: 'none',
+                    backgroundColor: '#ffffff',
+                    color: '#1f2937',
+                    fontSize: '13px',
+                    transition: 'all 0.2s ease',
+                    boxShadow: gstFocused ? '0 0 0 3px var(--primary-light)' : 'none'
+                  }}
+                />
               </div>
             </div>
 

@@ -321,7 +321,7 @@ const Login = ({ login, sessionExpiredMsg, onDismissSessionMsg }) => {
                   }} />
                   <input
                     type="email"
-                    placeholder="you@company.com"
+                    placeholder=""
                     value={email}
                     onChange={e => setEmail(e.target.value)}
                     onFocus={() => setEmailFocused(true)}
@@ -387,7 +387,7 @@ const Login = ({ login, sessionExpiredMsg, onDismissSessionMsg }) => {
                   }} />
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
+                    placeholder=""
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     onFocus={() => setPasswordFocused(true)}
@@ -525,7 +525,7 @@ const Login = ({ login, sessionExpiredMsg, onDismissSessionMsg }) => {
                   }} />
                   <input
                     type="email"
-                    placeholder="you@company.com"
+                    placeholder=""
                     value={forgotEmail}
                     onChange={e => setForgotEmail(e.target.value)}
                     onFocus={() => setForgotEmailFocused(true)}
@@ -620,7 +620,7 @@ const Login = ({ login, sessionExpiredMsg, onDismissSessionMsg }) => {
                   }} />
                   <input
                     type="text"
-                    placeholder="999888"
+                    placeholder=""
                     maxLength={6}
                     value={otp}
                     onChange={e => setOtp(e.target.value)}
@@ -734,7 +734,7 @@ const Login = ({ login, sessionExpiredMsg, onDismissSessionMsg }) => {
                   }} />
                   <input
                     type={showNewPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
+                    placeholder=""
                     value={newPassword}
                     onChange={e => setNewPassword(e.target.value)}
                     onFocus={() => setNewPassFocused(true)}
@@ -799,7 +799,7 @@ const Login = ({ login, sessionExpiredMsg, onDismissSessionMsg }) => {
                   }} />
                   <input
                     type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
+                    placeholder=""
                     value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)}
                     onFocus={() => setConfirmPassFocused(true)}

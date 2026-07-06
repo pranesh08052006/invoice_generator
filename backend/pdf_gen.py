@@ -8,7 +8,29 @@ from models import Invoice
 import datetime
 import os
 import requests
-from urllib.parse import unquote
+import socket
+import ipaddress
+from urllib.parse import unquote, urlparse
+
+def is_safe_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+        if not parsed.hostname:
+            return False
+        try:
+            ip = socket.gethostbyname(parsed.hostname)
+            ip_obj = ipaddress.ip_address(ip)
+            is_private = ip_obj.is_private or ip_obj.is_loopback
+        except Exception:
+            return False
+        if is_private:
+            path_lower = parsed.path.lower()
+            if path_lower.startswith("/uploads/") and ".." not in path_lower:
+                return True
+            return False
+        return True
+    except Exception:
+        return False
 
 def num_to_words(num):
     units = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]
@@ -94,7 +116,6 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
                 print(f"Loading logo from local path: {actual_path}")
                 logo_img = Image(actual_path, width=1.5*inch, height=1.0*inch)
             else:
-                # If file not found locally, try downloading it if it's a URL
                 if logo_url.startswith("http"):
                     try:
                         # Try localhost if the IP is inaccessible from within the server
@@ -102,14 +123,17 @@ def generate_invoice_pdf(invoice: Invoice, client, business_details: dict, doc_t
                         if "3.86.4.100" in logo_url:
                             target_url = logo_url.replace("http://3.86.4.100:8000", "http://localhost:8000")
                         
-                        print(f"Logo not found locally, trying to download from: {target_url}")
-                        r = requests.get(target_url, timeout=5)
-                        if r.status_code == 200:
-                            img_data = BytesIO(r.content)
-                            logo_img = Image(img_data, width=1.5*inch, height=1.0*inch)
-                            print("Logo downloaded and loaded into Image object successfully")
+                        if is_safe_url(target_url):
+                            print(f"Logo not found locally, trying to download from: {target_url}")
+                            r = requests.get(target_url, timeout=5)
+                            if r.status_code == 200:
+                                img_data = BytesIO(r.content)
+                                logo_img = Image(img_data, width=1.5*inch, height=1.0*inch)
+                                print("Logo downloaded and loaded into Image object successfully")
+                            else:
+                                print(f"Failed to download logo. Status: {r.status_code}")
                         else:
-                            print(f"Failed to download logo. Status: {r.status_code}")
+                            print(f"Blocked unsafe/private URL from SSRF download: {target_url}")
                     except Exception as down_err:
                         print(f"Download attempt failed: {down_err}")
         except Exception as e:

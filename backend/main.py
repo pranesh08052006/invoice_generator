@@ -1359,7 +1359,9 @@ async def save_company_details(company_in: CompanyCreate, user: User = Depends(g
             
     except Exception as e:
         import traceback
-        with open("d:/invoice_generator/backend/save_error.txt", "a") as f:
+        log_dir = "uploads/logs"
+        os.makedirs(log_dir, exist_ok=True)
+        with open(os.path.join(log_dir, "save_error.txt"), "a") as f:
             f.write(f"\n--- ERROR AT {datetime.now()} ---\n")
             f.write(f"Received data: {data}\n")
             f.write(f"Clean data: {clean_data}\n")
@@ -1373,8 +1375,16 @@ async def upload_logo(
     user: User = Depends(get_current_user)
 ):
     try:
+        ext = file.filename.split(".")[-1].lower()
+        if ext not in {"png", "jpg", "jpeg", "webp"}:
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid file type. Allowed formats: PNG, JPG, JPEG, WEBP."
+            )
+        
         os.makedirs("uploads/logos", exist_ok=True)
-        file_path = f"uploads/logos/{user.id}_{file.filename}"
+        safe_filename = os.path.basename(file.filename)
+        file_path = f"uploads/logos/{user.id}_{safe_filename}"
         with open(file_path, "wb") as f:
             f.write(await file.read())
         
@@ -1389,6 +1399,8 @@ async def upload_logo(
             await company.create()
             
         return {"logo_url": url}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1398,7 +1410,12 @@ async def upload_signature(
     user: User = Depends(get_current_user)
 ):
     try:
-        ext = file.filename.split(".")[-1]
+        ext = file.filename.split(".")[-1].lower()
+        if ext not in {"png", "jpg", "jpeg", "webp"}:
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid file type. Allowed formats: PNG, JPG, JPEG, WEBP."
+            )
         filename = f"sig_{user.id}.{ext}"
         filepath = os.path.join("uploads", filename)
         
@@ -1416,6 +1433,8 @@ async def upload_signature(
         # Return full URL for frontend
         base_url = os.getenv("BASE_URL", "http://localhost:8000")
         return {"signature_url": f"{base_url}/uploads/{filename}"}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"UPLOAD ERROR: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

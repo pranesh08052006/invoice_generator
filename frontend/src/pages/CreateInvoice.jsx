@@ -108,12 +108,10 @@ const CreateInvoice = ({ user, type = 'invoice' }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [cRes, pRes, iRes, payRes] = await Promise.all([
-          axios.get(`${API_BASE_URL}/clients`),
-          axios.get(`${API_BASE_URL}/products`),
-          axios.get(`${API_BASE_URL}/invoices`),
-          axios.get(`${API_BASE_URL}/payments`)
-        ]);
+        const cRes = await axios.get(`${API_BASE_URL}/clients`);
+        const pRes = await axios.get(`${API_BASE_URL}/products`);
+        const iRes = await axios.get(`${API_BASE_URL}/invoices`);
+        const payRes = await axios.get(`${API_BASE_URL}/payments`);
         
         const allInvoices = iRes.data;
         const allPayments = payRes.data;

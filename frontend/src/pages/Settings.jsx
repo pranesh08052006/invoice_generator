@@ -61,7 +61,6 @@ const SettingsPage = ({ user, company: globalCompany, fetchCompanyGlobal }) => {
   const [sigCacheBuster, setSigCacheBuster] = useState(Date.now());
 
   // Security and session states
-  const [userDetails, setUserDetails] = useState(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -70,10 +69,10 @@ const SettingsPage = ({ user, company: globalCompany, fetchCompanyGlobal }) => {
   const [passwordLoading, setPasswordLoading] = useState(false);
 
   useEffect(() => {
-    fetchCompany();
-    fetchSubscription();
-    fetchUserDetails();
-  }, []);
+    if (user?.role === 'user') {
+      fetchSubscription();
+    }
+  }, [user]);
 
   // Sync state if globalCompany updates
   useEffect(() => {
@@ -100,18 +99,6 @@ const SettingsPage = ({ user, company: globalCompany, fetchCompanyGlobal }) => {
       setLoading(false);
     }
   }, [globalCompany]);
-
-  const fetchUserDetails = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setUserDetails(response.data);
-    } catch (err) {
-      console.error("Error fetching user details:", err);
-    }
-  };
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
@@ -203,21 +190,7 @@ const SettingsPage = ({ user, company: globalCompany, fetchCompanyGlobal }) => {
     };
   }, [company.primary_color, company.secondary_color, globalCompany]);
 
-  const fetchCompany = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_BASE_URL}/company`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.data) {
-        setCompany(response.data);
-      }
-    } catch (err) {
-      console.error("Error fetching company:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const handleAssetUpload = async (e, type) => {
     const file = e.target.files[0];
@@ -565,7 +538,7 @@ const SettingsPage = ({ user, company: globalCompany, fetchCompanyGlobal }) => {
           </div>
 
           {/* Current Active Session Card (Only for User role) */}
-          {userDetails?.role === 'user' && (
+          {user?.role === 'user' && (
             <div style={{ 
               backgroundColor: 'var(--secondary-color)', 
               border: '1px solid #eaedf3', 
@@ -583,22 +556,22 @@ const SettingsPage = ({ user, company: globalCompany, fetchCompanyGlobal }) => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f8fafc', paddingBottom: '8px' }}>
                   <span style={{ color: '#4b5563', fontWeight: '500' }}>Device & Browser</span>
-                  <span style={{ color: '#111827', fontWeight: '600' }}>{userDetails.last_login_device || 'Unknown Device'}</span>
+                  <span style={{ color: '#111827', fontWeight: '600' }}>{user.last_login_device || 'Unknown Device'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f8fafc', paddingBottom: '8px' }}>
                   <span style={{ color: '#4b5563', fontWeight: '500' }}>IP Address</span>
-                  <span style={{ color: '#111827', fontWeight: '600', fontFamily: 'monospace' }}>{userDetails.last_login_ip || 'Unknown IP'}</span>
+                  <span style={{ color: '#111827', fontWeight: '600', fontFamily: 'monospace' }}>{user.last_login_ip || 'Unknown IP'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f8fafc', paddingBottom: '8px' }}>
                   <span style={{ color: '#4b5563', fontWeight: '500' }}>Login Time</span>
                   <span style={{ color: '#111827', fontWeight: '600' }}>
-                    {userDetails.last_login_at ? new Date(userDetails.last_login_at).toLocaleString() : 'N/A'}
+                    {user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'N/A'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#4b5563', fontWeight: '500' }}>Last Activity</span>
                   <span style={{ color: '#111827', fontWeight: '600' }}>
-                    {userDetails.last_activity_at ? new Date(userDetails.last_activity_at).toLocaleString() : 'Just now'}
+                    {user.last_activity_at ? new Date(user.last_activity_at).toLocaleString() : 'Just now'}
                   </span>
                 </div>
               </div>

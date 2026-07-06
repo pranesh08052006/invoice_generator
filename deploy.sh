@@ -204,8 +204,8 @@ log_info "=== STEP 8: NGINX ==="
 
 cat > /etc/nginx/sites-available/invoice-app << NGINXEOF
 # Rate limiting
-limit_req_zone \$binary_remote_addr zone=api:10m rate=30r/m;
-limit_req_zone \$binary_remote_addr zone=login:10m rate=5r/m;
+limit_req_zone \$binary_remote_addr zone=api:10m rate=180r/m;
+limit_req_zone \$binary_remote_addr zone=login:10m rate=15r/m;
 
 server {
     listen 80 default_server;
@@ -245,7 +245,7 @@ server {
         proxy_read_timeout 120s;
 
         # Rate limiting
-        limit_req zone=api burst=20 nodelay;
+        limit_req zone=api burst=50 nodelay;
     }
 
     # Stricter rate limit on login

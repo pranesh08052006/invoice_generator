@@ -46,10 +46,8 @@ const Proformas = ({ user }) => {
     const loadData = async () => {
       try {
         setLoading(true);
-        await Promise.all([
-          fetchProformas(),
-          fetchClients()
-        ]);
+        await fetchProformas();
+        await fetchClients();
       } catch (err) {
         console.error("Failed to load proforma data:", err);
       } finally {

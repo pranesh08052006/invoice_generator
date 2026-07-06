@@ -123,10 +123,8 @@ const AppLayout = ({ user, logout, company, logoVersion, children }) => {
       const token = localStorage.getItem('token');
       if (!token) return;
       
-      const [productsRes, invoicesRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/products`),
-        axios.get(`${API_BASE_URL}/invoices`)
-      ]);
+      const productsRes = await axios.get(`${API_BASE_URL}/products`);
+      const invoicesRes = await axios.get(`${API_BASE_URL}/invoices`);
       
       const newDynamic = [];
       
@@ -595,27 +593,64 @@ const App = () => {
   const [company, setCompany] = useState(null);
   const [logoVersion, setLogoVersion] = useState(Date.now());
   const [sessionExpiredMsg, setSessionExpiredMsg] = useState('');
+  const [isHydrating, setIsHydrating] = useState(() => !!localStorage.getItem('token'));
 
-  const fetchMe = async () => {
-    if (!token) return;
+  const fetchMe = async (authToken = token) => {
+    if (!authToken) return;
     try {
-      const res = await axios.get(`${API_BASE_URL}/auth/me`);
+      console.log("[App.jsx] Fetching user details...");
+      const res = await axios.get(`${API_BASE_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      console.log("[App.jsx] User details fetched successfully:", res.data.email);
       setUser(res.data);
       localStorage.setItem('user', JSON.stringify(res.data));
     } catch (err) {
-      console.error("Failed to refresh user data", err);
+      console.error("[App.jsx] Failed to refresh user data", err);
       if (err.response?.status === 401) logout();
+      throw err;
     }
   };
 
-  const fetchCompany = async () => {
-    if (!token) return;
+  const fetchCompany = async (authToken = token) => {
+    if (!authToken) return;
     try {
-      const res = await axios.get(`${API_BASE_URL}/company`);
+      console.log("[App.jsx] Fetching company details...");
+      const res = await axios.get(`${API_BASE_URL}/company`, {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      console.log("[App.jsx] Company details fetched successfully:", res.data.name);
       setCompany(res.data);
       setLogoVersion(Date.now());
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error("[App.jsx] Failed to fetch company details", err);
+    }
   };
+
+  // Run initial state hydration on mount
+  useEffect(() => {
+    const hydrate = async () => {
+      const storedToken = localStorage.getItem('token');
+      console.log("[App.jsx] Initializing app hydration. Token present:", !!storedToken);
+      if (storedToken) {
+        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        try {
+          await Promise.all([
+            fetchMe(storedToken),
+            fetchCompany(storedToken)
+          ]);
+          console.log("[App.jsx] Hydration successfully resolved both user and company contexts.");
+        } catch (err) {
+          console.error("[App.jsx] Hydration process encountered errors.", err);
+        } finally {
+          setIsHydrating(false);
+        }
+      } else {
+        setIsHydrating(false);
+      }
+    };
+    hydrate();
+  }, []);
 
   useEffect(() => {
     const primary = company?.primary_color || '#2563eb';
@@ -638,16 +673,18 @@ const App = () => {
   }, [company]);
 
   const login = (userData, token) => {
+    console.log("[App.jsx] User logged in:", userData.email);
     setUser(userData);
     setToken(token);
     setSessionExpiredMsg('');
     localStorage.setItem('user', JSON.stringify(userData));
     localStorage.setItem('token', token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    fetchCompany();
+    fetchCompany(token);
   };
 
   const logout = useCallback(async (showSessionMsg = false) => {
+    console.log("[App.jsx] User logout initiated. Session expired notice:", showSessionMsg);
     const currentToken = localStorage.getItem('token');
     
     // Clear all local auth state synchronously first to prevent any loops
@@ -679,8 +716,6 @@ const App = () => {
   useEffect(() => {
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      fetchMe();
-      fetchCompany();
     }
     const interceptor = axios.interceptors.response.use(
       (response) => response,
@@ -707,21 +742,59 @@ const App = () => {
 
   // Periodically check session validity for all users every 5 seconds to trigger real-time logout
   useEffect(() => {
-    if (!token) return;
+    if (!token || isHydrating) return;
 
     const interval = setInterval(async () => {
       try {
         await axios.get(`${API_BASE_URL}/auth/me`);
       } catch (err) {
         // Axios interceptor will handle the 401 Session Expired response automatically
-        console.warn("Session check failed", err);
+        console.warn("[App.jsx] Session validity check failed", err);
       }
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [token]);
+  }, [token, isHydrating]);
 
   const isLoggedIn = !!token && !!user;
+
+  if (isHydrating) {
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+        color: '#ffffff',
+        fontFamily: 'Inter, system-ui, -apple-system, sans-serif'
+      }}>
+        <div style={{ position: 'relative', marginBottom: '24px' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            border: '3px solid rgba(255, 255, 255, 0.1)',
+            borderTop: '3px solid #3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite'
+          }} />
+        </div>
+        <h2 style={{ fontSize: '18px', fontWeight: '600', letterSpacing: '-0.025em', margin: '0 0 8px 0' }}>
+          Digital Viyabari
+        </h2>
+        <p style={{ fontSize: '14px', color: '#94a3b8', margin: 0 }}>
+          Initializing secure session...
+        </p>
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <Router>

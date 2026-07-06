@@ -102,13 +102,12 @@ const Clients = ({ user, company }) => {
   const fetchClients = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
-      const [cRes, iRes, qRes, pRes, payRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/clients`),
-        axios.get(`${API_BASE_URL}/invoices`),
-        axios.get(`${API_BASE_URL}/quotations`),
-        axios.get(`${API_BASE_URL}/proformas`),
-        axios.get(`${API_BASE_URL}/payments`)
-      ]);
+      const cRes = await axios.get(`${API_BASE_URL}/clients`);
+      const iRes = await axios.get(`${API_BASE_URL}/invoices`);
+      const qRes = await axios.get(`${API_BASE_URL}/quotations`);
+      const pRes = await axios.get(`${API_BASE_URL}/proformas`);
+      const payRes = await axios.get(`${API_BASE_URL}/payments`);
+
       setClients(cRes.data);
       setInvoices(iRes.data);
       setQuotations(qRes.data);

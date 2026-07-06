@@ -73,11 +73,9 @@ const Invoices = ({ user }) => {
     const loadData = async () => {
       try {
         setLoading(true);
-        await Promise.all([
-          fetchInvoices(),
-          fetchClients(),
-          fetchPayments()
-        ]);
+        await fetchInvoices();
+        await fetchClients();
+        await fetchPayments();
       } catch (err) {
         console.error("Failed to load invoice data:", err);
       } finally {

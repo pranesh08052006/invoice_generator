@@ -46,10 +46,8 @@ const Quotations = ({ user }) => {
     const loadData = async () => {
       try {
         setLoading(true);
-        await Promise.all([
-          fetchQuotations(),
-          fetchClients()
-        ]);
+        await fetchQuotations();
+        await fetchClients();
       } catch (err) {
         console.error("Failed to load quotation data:", err);
       } finally {
